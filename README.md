@@ -1,5 +1,8 @@
 # Trasher
 
+[![crates.io](https://img.shields.io/crates/v/trasher)](https://crates.io/crates/trasher)
+[![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-success.svg)](https://github.com/rust-secure-code/safety-dance/)
+
 Trasher is a small command-line utility that aims to replace `rm`.
 
 It works by moving items to delete to a _trash directory_ instead of deleting them immediatly. As moving a single item is nearly instant (even when it's a large directory), while deleting items recursively can take quite a long time, Trasher is **faster** than `rm`, especially for large directories.
