@@ -73,7 +73,7 @@ pub fn expect_trash_item(trash_dir: impl AsRef<Path>, filename: &str, id: Option
 pub fn get_fs_details(path: impl AsRef<Path>) -> IoResult<FSDetails> {
     let metadata = fs::metadata(&path)?;
 
-    let is_dir = metadata.is_file();
+    let is_dir = metadata.is_dir();
 
     if metadata.file_type().is_symlink() {
         return Ok(FSDetails {
