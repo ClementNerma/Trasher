@@ -1,4 +1,4 @@
-use clap::Clap;
+use clap::{Clap, crate_version};
 use std::path::PathBuf;
 
 lazy_static! {
@@ -6,7 +6,7 @@ lazy_static! {
 }
 
 #[derive(Clap)]
-#[clap(version = "1.1.0", author = "Clément Nerma <clement.nerma@gmail.com>")]
+#[clap(version = crate_version!(), author = "Clément Nerma <clement.nerma@gmail.com>")]
 pub struct Opts {
     #[clap(short, long, parse(from_os_str))]
     pub trash_dir: PathBuf,
