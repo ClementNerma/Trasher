@@ -51,7 +51,12 @@ pub fn list(action: &ListTrashItems) {
 }
 
 pub fn remove(action: &MoveToTrash) {
-    let MoveToTrash { path, permanently, allow_invalid_utf8_item_names } = action;
+    let MoveToTrash {
+        path,
+        permanently,
+        allow_invalid_utf8_item_names,
+        move_ext_filesystems
+    } = action;
 
     let path = PathBuf::from(path);
 
@@ -81,8 +86,19 @@ pub fn remove(action: &MoveToTrash) {
 
     debug!("Moving item to trash under name '{}'...", trash_item.trash_filename());
 
-    if let Err(err) = fs::rename(&path, &OPTS.trash_dir.join(trash_item.trash_filename())) {
-        fail!("Failed to move item to trash: {}", err);
+    let trash_item_path = &OPTS.trash_dir.join(trash_item.trash_filename());
+
+    if let Err(err) = fs::rename(&path, &trash_item_path) {
+        if !move_ext_filesystems {
+            fail!("Failed to move item to trash: {}", err);
+        }
+        
+        debug!("Renaming failed: {}", err);
+        debug!("Falling back to copying.");
+
+        move_item_pbr(&path, &trash_item_path).unwrap_or_else(|err|
+            fail!("Failed to move item to trash (using copying fallback): {}", err)
+        )
     }
 }
 
@@ -110,7 +126,15 @@ pub fn drop(action: &DropItem) {
 }
 
 pub fn restore(action: &RestoreItem) {
-    let RestoreItem { filename, to, id, force } = action;
+    let RestoreItem {
+        filename,
+        to,
+        id,
+        force,
+        move_ext_filesystems
+    } = action;
+
+    // TODO!!!!!!
 
     debug!("Listing trash items...");
 
@@ -136,7 +160,16 @@ pub fn restore(action: &RestoreItem) {
             debug!("Restoring item from trash...");
 
             if let Err(err) = fs::rename(&item_path, &target_path) {
-                fail!("Failed to restore item '{}' from trash: {}", item.filename(), err);
+                if !move_ext_filesystems {
+                    fail!("Failed to restore item '{}' from trash: {}", item.filename(), err);
+                }
+                
+                debug!("Renaming failed: {}", err);
+                debug!("Falling back to copying.");
+
+                move_item_pbr(&item_path, &target_path).unwrap_or_else(|err|
+                    fail!("Failed to restore item from trash (using copying fallback): {}", err)
+                )
             }
         },
 

@@ -57,7 +57,10 @@ pub struct MoveToTrash {
     pub permanently: bool,
 
     #[clap(short, long, conflicts_with="permanently")]
-    pub allow_invalid_utf8_item_names: bool
+    pub move_ext_filesystems: bool,
+
+    #[clap(short, long, conflicts_with="permanently")]
+    pub allow_invalid_utf8_item_names: bool,
 }
 
 #[derive(Clap)]
@@ -70,6 +73,9 @@ pub struct RestoreItem {
 
     #[clap(long)]
     pub id: Option<String>,
+
+    #[clap(short, long, conflicts_with="permanently")]
+    pub move_ext_filesystems: bool,
 
     #[clap(short, long)]
     pub force: bool

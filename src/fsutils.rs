@@ -2,6 +2,11 @@ use std::fs;
 use std::fmt;
 use std::path::Path;
 use std::io::Result as IoResult;
+use std::error::Error;
+use std::rc::Rc;
+use std::cell::RefCell;
+use fs_extra::dir::TransitProcessResult;
+use indicatif::{ProgressBar, ProgressStyle};
 use super::command::OPTS;
 use super::items::TrashItem;
 
@@ -105,6 +110,46 @@ pub fn human_readable_size(bytes: u64) -> String {
     }
 
     return format!("{:.2} {}", bytes as f64 / compare as f64, names.last().unwrap());
+}
+
+/// Move items around with a progressbar
+pub fn move_item_pbr(path: &Path, target: &Path) -> Result<(), Box<dyn Error>> {
+    let pbr = Rc::new(RefCell::new(None));
+
+    let update_pbr = |copied, total, item_name: &str| {
+        let mut pbr = pbr.borrow_mut();
+        let pbr = pbr.get_or_insert_with(|| {
+            let pbr = ProgressBar::new(total);
+            pbr.set_style(ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+            .progress_chars("#>-"));
+            pbr
+        });
+
+        pbr.set_position(copied);
+        pbr.set_message(item_name);
+    };
+
+    if path.metadata()?.is_file() {
+        let file_name = path.file_name().unwrap().to_string_lossy();
+
+        fs_extra::file::move_file_with_progress(path, target, &fs_extra::file::CopyOptions::new(), |tp| {
+            update_pbr(tp.copied_bytes, tp.total_bytes, &file_name);
+        })?;
+    } else {
+        let mut config = fs_extra::dir::CopyOptions::new();
+        config.copy_inside = true;
+        fs_extra::dir::move_dir_with_progress(path, target, &config, |tp| {
+            update_pbr(tp.copied_bytes, tp.total_bytes, &tp.file_name);
+            TransitProcessResult::ContinueOrAbort
+        })?;
+    }
+
+    let mut pbr = pbr.borrow_mut();
+    let pbr = pbr.as_mut();
+    pbr.map(|pbr| pbr.finish_with_message("Moving complete."));
+    
+    return Ok(());
 }
 
 /// Trash items found with the [`expect_trash_item`] function
