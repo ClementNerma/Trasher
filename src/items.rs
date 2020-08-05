@@ -62,13 +62,6 @@ impl TrashItem {
     pub fn decode(final_name: &str) -> Result<TrashItem, TrashItemDecodingError> {
         let captured = DECODER.captures(final_name)
             .ok_or(TrashItemDecodingError::InvalidFilenameFormat)?;
-        
-        /*let id = decode_config(&captured["id"], URL_SAFE_NO_PAD)
-            .map_err(TrashItemDecodingError::InvalidIDFormat)?;
-
-        if id.len() != 3 {
-            return Err(TrashItemDecodingError::InvalidIDLength { found: id.len(), expected: 3 });
-        }*/
 
         let datetime = DateTime::parse_from_str(&captured["datetime"], DATETIME_FORMAT)
             .map_err(TrashItemDecodingError::InvalidDateTime)?;
@@ -99,8 +92,6 @@ pub enum TrashItemDecodingError {
     InvalidFilenameFormat,
     InvalidDateTime(chrono::ParseError),
     TimezoneDecodingError,
-    //InvalidIDFormat(base64::DecodeError),
-    //InvalidIDLength { found: usize, expected: usize },
     IDDoesNotMatch { found: String, expected: String }
 }
 
@@ -110,8 +101,6 @@ impl fmt::Debug for TrashItemDecodingError {
             Self::InvalidFilenameFormat => "File name format is invalid".to_string(),
             Self::InvalidDateTime(err) => format!("Invalid date/time in file name: {:?}", err.to_string()),
             Self::TimezoneDecodingError => format!("Date/time is invalid for the local timezone"),
-            //Self::InvalidIDFormat(err) => format!("ID is not correctly base64-encoded: {:?}", err),
-            //Self::InvalidIDLength { found, expected } => format!("Decoded ID is {} byte(s) long but is should be made of {} byte(s)", found, expected),
             Self::IDDoesNotMatch { found, expected } => format!("Found ID '{}' but expected one was '{}'", found, expected)
         })
     }
