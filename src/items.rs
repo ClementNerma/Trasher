@@ -9,7 +9,7 @@ use regex::Regex;
 
 lazy_static! {
     static ref DECODER: Regex = Regex::new(
-        "^(?P<filename>.*)\\s\\[@\\s(?P<datetime>.*)\\]\\s\\{(?P<id>[\\da-zA-Z]+)\\}(\\.[^\\.]*)?$"
+        "^(?P<filename>.*)\\s\\[@\\s(?P<datetime>.*)\\]\\s\\{(?P<id>[\\da-zA-Z_\\-]+)\\}(\\.[^\\.]*)?$"
     ).unwrap();
 }
 
