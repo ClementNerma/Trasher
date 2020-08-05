@@ -67,8 +67,9 @@ pub fn remove(action: &MoveToTrash) {
     }
 
     if *permanently {
-        if let Err(err) = fs::remove_dir_all(&path) {
-            fail!("Failed to permanently remove item: {}", err);
+        match fs::remove_dir_all(&path) {
+            Err(err) => fail!("Failed to permanently remove item: {}", err),
+            Ok(()) => return
         }
     }
 
