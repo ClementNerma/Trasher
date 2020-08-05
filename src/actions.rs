@@ -54,9 +54,16 @@ pub fn remove(action: &MoveToTrash) {
     let MoveToTrash {
         path,
         permanently,
-        allow_invalid_utf8_item_names,
-        move_ext_filesystems
+        move_ext_filesystems,
+        size_limit_move_ext_filesystems,
+        allow_invalid_utf8_item_names
     } = action;
+
+    let size_limit_move_ext_filesystems = size_limit_move_ext_filesystems.as_ref().map(|size_limit|
+        parse_human_readable_size(&size_limit).unwrap_or_else(|err|
+            fail!("Invalid size limit provided for externals filesystems' items moving: {}", err)
+        )
+    );
 
     let path = PathBuf::from(path);
 
@@ -102,6 +109,23 @@ pub fn remove(action: &MoveToTrash) {
         
         debug!("Renaming failed: {}", err);
         debug!("Falling back to copying.");
+
+        if let Some(size_limit) = size_limit_move_ext_filesystems {
+            debug!("Size limit was provided: {}", human_readable_size(size_limit));
+            debug!("Computing size of the item to remove...");
+
+            let details = get_fs_details(&path).unwrap_or_else(|err|
+                fail!("Failed to compute size of item before sending it to the trash: {}", err)
+            );
+
+            if details.size > size_limit {
+                fail!(
+                    "This item ({}) is larger than the provided size limit ({}).",
+                    human_readable_size(details.size),
+                    human_readable_size(size_limit)
+                );
+            }
+        }
 
         move_item_pbr(&path, &trash_item_path).unwrap_or_else(|err|
             fail!("Failed to move item to trash (using copying fallback): {}", err)

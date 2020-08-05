@@ -62,6 +62,9 @@ pub struct MoveToTrash {
     #[clap(short, long, conflicts_with="permanently", about = "For external filesystems, move the item to the main filesystem's trash directory")]
     pub move_ext_filesystems: bool,
 
+    #[clap(short, long, requires="move-ext-filesystems", about = "Only apply '--move-ext-filesystems' if the item size is lower or equal to the provided one")]
+    pub size_limit_move_ext_filesystems: Option<String>,
+
     #[clap(short, long, conflicts_with="permanently", about = "Do not fail when encoutering invalid UTF-8 file names")]
     pub allow_invalid_utf8_item_names: bool,
 }

@@ -7,6 +7,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use fs_extra::dir::TransitProcessResult;
 use indicatif::{ProgressBar, ProgressStyle};
+use regex::Regex;
 use super::command::OPTS;
 use super::items::TrashItem;
 
@@ -15,7 +16,7 @@ pub const TRASH_TRANSFER_DIRNAME: &'static str = "#PARTIAL";
 
 lazy_static! {
     /// Path to the transfer directory in the trash
-    static ref TRASH_TRANSFER_DIR: PathBuf = OPTS.trash_dir.join(TRASH_TRANSFER_DIRNAME);
+    pub static ref TRASH_TRANSFER_DIR: PathBuf = OPTS.trash_dir.join(TRASH_TRANSFER_DIRNAME);
 }
 
 /// List and parse all items in the trash
@@ -157,6 +158,45 @@ pub fn human_readable_size(bytes: u64) -> String {
     }
 
     return format!("{:.2} {}", bytes as f64 / compare as f64, names.last().unwrap());
+}
+
+lazy_static! {
+    static ref PARSE_SIZE_STR: Regex = Regex::new(
+        "^(?i)(?P<intqty>\\d+)(?:\\.(?P<decqty>\\d+))?(?P<unit>[BKMGTPE])(?:i?B)?$"
+    ).unwrap();
+}
+
+/// Convert a human-readable size back to a number of bytes
+pub fn parse_human_readable_size(size: &str) -> Result<u64, &'static str> {
+    let captured = PARSE_SIZE_STR.captures(size).ok_or("Unknown size format")?;
+
+    let int = captured["intqty"].parse::<u64>().unwrap();
+    let dec = captured.name("decqty");
+
+    let unit_char = captured["unit"].chars().next().unwrap().to_ascii_uppercase();
+    let unit_size = 1024u64.pow("BKMGTPE".chars().position(|c| c == unit_char).unwrap() as u32);
+
+    if dec.is_some() && unit_size == 1 {
+        return Err("Cannot use decimal bytes");
+    }
+
+    let dec_size = match dec {
+        None => 0,
+        Some(dec) => {
+            let dec = dec.as_str();
+
+            let dec_num = dec.parse::<u64>().unwrap();
+            let unit_divider = 10u64.pow(dec.len() as u32);
+            
+            if unit_divider.to_string().len() > unit_size.to_string().len() {
+                return Err("Too many decimals for this unit, would give decimal bytes");
+            }
+            
+            unit_size * dec_num / unit_divider
+        }
+    };
+
+    Ok(int * unit_size + dec_size)
 }
 
 /// Move items around with a progressbar

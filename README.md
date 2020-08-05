@@ -33,6 +33,8 @@ As Trasher only takes the trash directory it has been provided, you can use a de
 
 But if you only want to use a single trash directory on, let's say, your computer's internal hard drive / SSD, removing items from an external storage device will fail by default. You can still allow it by providing the `-m / --move-ext-filesystems` option, which will make Trasher move the deleted items to the main filesystem's trash, which can take a lot of time if there are many (especially large) files and/or directories to move around.
 
+It's also possible to specify a size limit for external filesystems' items. This way, items won't be moved around if they are too large, making the command fail instead. Such size can be provided with `-s / --size-limit-move-ext-filesystems` using an integer or floating-point size suffixed by either `B` for bytes, `K` for kilobytes, `M` for megabytes, `G` for gigabytes, `T` for terabytes, `P` for petabytes and finally `E` for exabytes. It's also possible to add another `B` or `iB` which makes the following sizes all valid: `2.4M`, `2.4MB`, `2.4MiB`.
+
 ## Usage
 
 All commands look like this:
