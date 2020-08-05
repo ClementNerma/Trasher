@@ -135,8 +135,6 @@ pub fn restore(action: &RestoreItem) {
         move_ext_filesystems
     } = action;
 
-    // TODO!!!!!!
-
     debug!("Listing trash items...");
 
     match expect_trash_item(&OPTS.trash_dir, &filename, id.as_deref()).unwrap() {
