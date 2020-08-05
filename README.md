@@ -23,6 +23,16 @@ This renaming also allows to delete multiple items with the same name without an
 
 You can then then restore items from the trash by specifying their names. If multiple items have the same name, a list of items with the provided name will be displayed along with their ID, and you will be asked to specify the ID of the item you want to restore.
 
+### External filesystems
+
+The moving is actually performed by renaming the file, which is a lot faster than moving data around and gives exactly the same result. But, for external filesystems, sending an item to the trash means it must be moved, which can be quite slow.
+
+On Windows, deleting an item from a NTFS device will send it to a device-specific recycle bin located in this drive and handled by Windows itself.
+
+As Trasher only takes the trash directory it has been provided, you can use a device-specific trash by simply providing a trash directory path that is on the device you're removing items from.
+
+But if you only want to use a single trash directory on, let's say, your computer's internal hard drive / SSD, removing items from an external storage device will fail by default. You can still allow it by providing the `-m / --move-ext-filesystems` option, which will make Trasher move the deleted items to the main filesystem's trash, which can take a lot of time if there are many (especially large) files and/or directories to move around.
+
 ## Usage
 
 All commands look like this:
