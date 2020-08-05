@@ -1,6 +1,6 @@
 use std::fs;
 use std::fmt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::io::Result as IoResult;
 use std::error::Error;
 use std::rc::Rc;
@@ -10,18 +10,32 @@ use indicatif::{ProgressBar, ProgressStyle};
 use super::command::OPTS;
 use super::items::TrashItem;
 
+/// Name of the transfer directory in the trash
+pub const TRASH_TRANSFER_DIRNAME: &'static str = "#PARTIAL";
+
+lazy_static! {
+    /// Path to the transfer directory in the trash
+    static ref TRASH_TRANSFER_DIR: PathBuf = OPTS.trash_dir.join(TRASH_TRANSFER_DIRNAME);
+}
+
 /// List and parse all items in the trash
 pub fn list_trash_items(trash_path: impl AsRef<Path>) -> IoResult<Vec<TrashItem>> {
     Ok(fs::read_dir(trash_path)?.collect::<Result<Vec<_>, _>>()?.iter().filter_map(|item| {
         match item.file_name().into_string() {
             Err(invalid_filename) => eprintln!("WARN: Trash item '{}' does not have a valid UTF-8 filename!", invalid_filename.to_string_lossy()),
 
-            Ok(filename) => match TrashItem::decode(&filename) {
-                Err(err) => {
-                    eprintln!("WARN: Trash item '{}' does not have a valid trash filename!", filename);
-                    super::debug!("Invalid trash item filename: {:?}", err);
-                },
-                Ok(trash_item) => return Some(trash_item)
+            Ok(filename) => {
+                if filename == TRASH_TRANSFER_DIRNAME {
+                    return None
+                }
+
+                match TrashItem::decode(&filename) {
+                    Err(err) => {
+                        eprintln!("WARN: Trash item '{}' does not have a valid trash filename!", filename);
+                        super::debug!("Invalid trash item filename: {:?}", err);
+                    },
+                    Ok(trash_item) => return Some(trash_item)
+                }
             }
         }
 
@@ -89,6 +103,29 @@ pub fn get_fs_details(path: impl AsRef<Path>) -> IoResult<FSDetails> {
     }
 
     return Ok(details);
+}
+
+/// Get the trash path for an item that's going to be transferred to it
+pub fn transfer_trash_item_path(item: &TrashItem) -> PathBuf {
+    OPTS.trash_dir.join(TRASH_TRANSFER_DIRNAME).join(item.trash_filename())
+}
+
+pub fn complete_trash_item_path(item: &TrashItem) -> PathBuf {
+    OPTS.trash_dir.join(item.trash_filename())
+}
+
+/// Move a partial item to the trash's main directory once the transfer is complete
+pub fn move_transferred_trash_item(item: &TrashItem) -> IoResult<()> {
+    fs::rename(transfer_trash_item_path(item), complete_trash_item_path(item))
+}
+
+/// Cleanup the transfer directory
+pub fn cleanup_transfer_dir() -> IoResult<()> {
+    if TRASH_TRANSFER_DIR.exists() {
+        fs::remove_dir_all(TRASH_TRANSFER_DIR.as_path())
+    } else {
+        Ok(())
+    }
 }
 
 /// Convert a size in bytes to a human-readable size

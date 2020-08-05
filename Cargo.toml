@@ -1,6 +1,6 @@
 [package]
 name = "trasher"
-version = "1.1.2"
+version = "1.2.0"
 authors = ["Clément Nerma <clement.nerma@gmail.com>"]
 edition = "2018"
 license = "Apache-2.0"

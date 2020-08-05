@@ -14,6 +14,9 @@ pub struct Opts {
     #[clap(short, long)]
     pub create_trash_dir: bool,
 
+    #[clap(long, about = "Don't clean up the transfer directory automatically")]
+    pub no_cleanup: bool,
+
     #[clap(short, long)]
     pub verbose: bool,
 

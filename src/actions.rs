@@ -27,7 +27,7 @@ pub fn list(action: &ListTrashItems) {
 
             for item in items {
                 println!("* {}{}", item, if *details || OPTS.verbose {
-                    let details = get_fs_details(OPTS.trash_dir.join(item.trash_filename())).unwrap();
+                    let details = get_fs_details(complete_trash_item_path(&item)).unwrap();
                     let dir_one = if details.is_directory { 1 } else { 0 };
 
                     total_size += details.size;
@@ -87,7 +87,7 @@ pub fn remove(action: &MoveToTrash) {
 
     debug!("Moving item to trash under name '{}'...", trash_item.trash_filename());
 
-    let trash_item_path = &OPTS.trash_dir.join(trash_item.trash_filename());
+    let trash_item_path = transfer_trash_item_path(&trash_item);
 
     if let Err(err) = fs::rename(&path, &trash_item_path) {
         if !move_ext_filesystems {
@@ -101,6 +101,18 @@ pub fn remove(action: &MoveToTrash) {
             fail!("Failed to move item to trash (using copying fallback): {}", err)
         )
     }
+
+    let mut rename_errors = 0;
+
+    while let Err(err) = move_transferred_trash_item(&trash_item) {
+        rename_errors += 1;
+
+        debug!("Failed to rename transferred item in trash (try n°{}): {}", rename_errors, err);
+
+        if rename_errors == 5 {
+            fail!("Failed to rename transferred item in trash after {} tries: {}", rename_errors, err);
+        }
+    }
 }
 
 pub fn drop(action: &DropItem) {
@@ -110,7 +122,7 @@ pub fn drop(action: &DropItem) {
 
     match expect_trash_item(&OPTS.trash_dir, &filename, id.as_deref()).unwrap() {
         FoundTrashItems::Single(item) => {
-            let item_path = OPTS.trash_dir.join(item.trash_filename());
+            let item_path = complete_trash_item_path(&item);
 
             debug!("Permanently removing item from trash...");
 
@@ -139,7 +151,7 @@ pub fn restore(action: &RestoreItem) {
 
     match expect_trash_item(&OPTS.trash_dir, &filename, id.as_deref()).unwrap() {
         FoundTrashItems::Single(item) => {
-            let item_path = OPTS.trash_dir.join(item.trash_filename());
+            let item_path = complete_trash_item_path(&item);
             let target_path = to.clone()
                 .unwrap_or_else(|| std::env::current_dir().unwrap())
                 .join(item.filename());

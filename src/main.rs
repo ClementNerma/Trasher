@@ -9,6 +9,7 @@ mod fsutils;
 #[macro_use] extern crate lazy_static;
 
 use std::fs;
+use fsutils::cleanup_transfer_dir;
 use command::*;
 
 #[macro_export]
@@ -43,5 +44,9 @@ fn main() {
         Action::Clear(action) => actions::clear(action)
     }
 
-    debug!("Done.");
+    if !OPTS.no_cleanup {
+        if let Err(err) = cleanup_transfer_dir() {
+            fail!("Failed to cleanup the transfer directory: {}", err)
+        }
+    }
 }
