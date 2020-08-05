@@ -28,7 +28,7 @@ pub fn list(action: &ListTrashItems) {
             for item in items {
                 println!("* {}{}", item, if *details || OPTS.verbose {
                     let details = get_fs_details(complete_trash_item_path(&item)).unwrap();
-                    let dir_one = if details.is_directory { 1 } else { 0 };
+                    let dir_one = if details.is_dir { 1 } else { 0 };
 
                     total_size += details.size;
                     total_dirs += details.sub_files + dir_one;

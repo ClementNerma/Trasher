@@ -73,12 +73,22 @@ pub fn expect_trash_item(trash_dir: impl AsRef<Path>, filename: &str, id: Option
 pub fn get_fs_details(path: impl AsRef<Path>) -> IoResult<FSDetails> {
     let metadata = fs::metadata(&path)?;
 
-    let is_symlink = metadata.file_type().is_symlink();
+    let is_dir = metadata.is_file();
 
-    if metadata.is_file() {
+    if metadata.file_type().is_symlink() {
         return Ok(FSDetails {
-            is_symlink,
-            is_directory: false,
+            is_symlink: true,
+            is_dir,
+            sub_directories: 0,
+            sub_files: 0,
+            size: 0
+        });
+    }
+
+    if !is_dir {
+        return Ok(FSDetails {
+            is_symlink: false,
+            is_dir: false,
             sub_directories: 0,
             sub_files: 0,
             size: metadata.len()
@@ -86,8 +96,8 @@ pub fn get_fs_details(path: impl AsRef<Path>) -> IoResult<FSDetails> {
     }
 
     let mut details = FSDetails {
-        is_symlink,
-        is_directory: true,
+        is_symlink: false,
+        is_dir: true,
         sub_directories: 0,
         sub_files: 0,
         size: 0
@@ -95,7 +105,7 @@ pub fn get_fs_details(path: impl AsRef<Path>) -> IoResult<FSDetails> {
 
     for item in fs::read_dir(&path)? {
         let item_details = get_fs_details(item?.path())?;
-        let dir_one = if item_details.is_directory { 1 } else { 0 };
+        let dir_one = if item_details.is_dir { 1 } else { 0 };
 
         details.sub_directories += item_details.sub_directories + dir_one;
         details.sub_files += item_details.sub_files + (1 - dir_one);
@@ -198,7 +208,7 @@ pub enum FoundTrashItems {
 /// Details on a filesystem item returned by the [`get_fs_details`] function
 pub struct FSDetails {
     pub is_symlink: bool,
-    pub is_directory: bool,
+    pub is_dir: bool,
     pub sub_directories: u64,
     pub sub_files: u64,
     pub size: u64
@@ -209,9 +219,9 @@ impl fmt::Display for FSDetails {
         write!(
             f,
             " | [{}] Size: {}{}",
-            if self.is_symlink { "Symlink" } else if self.is_directory { "Directory" } else { "File" },
+            if self.is_symlink { "Symlink" } else if self.is_dir { "Directory" } else { "File" },
             human_readable_size(self.size),
-            if self.is_directory {
+            if self.is_dir {
                 format!(
                     ", Items: {}, Directories: {}, Files: {}",
                     self.sub_directories + self.sub_files,
