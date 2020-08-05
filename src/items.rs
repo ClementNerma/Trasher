@@ -51,7 +51,8 @@ impl TrashItem {
 
     pub fn trash_filename(&self) -> String {
         let extension = match PathBuf::from(&self.filename).extension() {
-            Some(ext) => ext.to_string_lossy().to_string(),
+            // There cannot be any loss here as the provided filename is a valid UTF-8 string
+            Some(ext) => format!(".{}", ext.to_string_lossy().to_string()),
             None => "".to_string()
         };
 
