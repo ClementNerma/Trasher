@@ -103,11 +103,12 @@ pub fn remove(action: &MoveToTrash) {
     }
 
     if let Err(err) = fs::rename(&path, &trash_item_path) {
+        debug!("Renaming failed: {:?}", err);
+        
         if !move_ext_filesystems {
             fail!("Failed to move item to trash: {}", err);
         }
         
-        debug!("Renaming failed: {}", err);
         debug!("Falling back to copying.");
 
         if let Some(size_limit) = size_limit_move_ext_filesystems {
