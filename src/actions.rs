@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
+use std::io::ErrorKind;
 use super::{debug, fail};
 use super::command::*;
 use super::items::*;
@@ -105,8 +106,12 @@ pub fn remove(action: &MoveToTrash) {
     if let Err(err) = fs::rename(&path, &trash_item_path) {
         debug!("Renaming failed: {:?}", err);
         
+        if err.kind() != ErrorKind::Other {
+            fail!("An error occured while trying to move item to trash: {}", err);
+        }
+
         if !move_ext_filesystems {
-            fail!("Failed to move item to trash: {}", err);
+            fail!("Failed to move item to trash: {}\nHelp: Item may be located on another drive, try with '--move-ext-filesystems'.", err);
         }
         
         debug!("Falling back to copying.");
