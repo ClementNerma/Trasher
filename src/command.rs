@@ -53,16 +53,16 @@ pub struct ListTrashItems {
 
 #[derive(Clap)]
 pub struct MoveToTrash {
-    #[clap(about = "Item path to move to the trash")]
-    pub path: String,
+    #[clap(about = "Path of the items to move to the trash")]
+    pub paths: Vec<String>,
 
-    #[clap(short, long, about = "Delete the item permanently")]
+    #[clap(short, long, about = "Delete the items permanently")]
     pub permanently: bool,
 
-    #[clap(short, long, conflicts_with="permanently", about = "For external filesystems, move the item to the main filesystem's trash directory")]
+    #[clap(short, long, conflicts_with="permanently", about = "For external filesystems, move the items to the main filesystem's trash directory")]
     pub move_ext_filesystems: bool,
 
-    #[clap(short, long, requires="move-ext-filesystems", about = "Only apply '--move-ext-filesystems' if the item size is lower or equal to the provided one")]
+    #[clap(short, long, requires="move-ext-filesystems", about = "Only apply '--move-ext-filesystems' if the items' size is lower or equal to the provided one")]
     pub size_limit_move_ext_filesystems: Option<String>,
 
     #[clap(short, long, conflicts_with="permanently", about = "Do not fail when encoutering invalid UTF-8 file names")]

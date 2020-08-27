@@ -53,7 +53,7 @@ pub fn list(action: &ListTrashItems) {
 
 pub fn remove(action: &MoveToTrash) {
     let MoveToTrash {
-        path,
+        paths,
         permanently,
         move_ext_filesystems,
         size_limit_move_ext_filesystems,
@@ -66,87 +66,93 @@ pub fn remove(action: &MoveToTrash) {
         )
     );
 
-    let path = PathBuf::from(path);
+    debug!("Going to remove {} item(s)...", paths.len());
 
-    debug!("Checking if item exists...");
+    for (i, path) in paths.iter().enumerate() {
+        debug!("Treating item {} on {}...", i, paths.len());
 
-    if !path.exists() {
-        fail!("Item path does not exist.");
-    }
+        let path = PathBuf::from(path);
 
-    if *permanently {
-        match fs::remove_dir_all(&path) {
-            Err(err) => fail!("Failed to permanently remove item: {}", err),
-            Ok(()) => return
-        }
-    }
+        debug!("Checking if item exists...");
 
-    let filename = path.file_name().unwrap_or_else(|| fail!("Specified item path has no file name"));
-    let filename = match filename.to_str() {
-        Some(str) => str.to_string(),
-        None => if *allow_invalid_utf8_item_names {
-            filename.to_string_lossy().to_string()
-        } else {
-            fail!("Specified item does not have a valid UTF-8 file name")
-        }
-    };
-
-    let trash_item = TrashItem::new_now(filename.to_string());
-
-    debug!("Moving item to trash under name '{}'...", trash_item.trash_filename());
-
-    let trash_item_path = transfer_trash_item_path(&trash_item);
-
-    if !TRASH_TRANSFER_DIR.exists() {
-        fs::create_dir_all(TRASH_TRANSFER_DIR.as_path()).unwrap_or_else(|err|
-            fail!("Failed to create trash's transfer directory: {}", err)
-        );
-    }
-
-    if let Err(err) = fs::rename(&path, &trash_item_path) {
-        debug!("Renaming failed: {:?}", err);
-        
-        if err.kind() != ErrorKind::Other {
-            fail!("An error occured while trying to move item to trash: {}", err);
+        if !path.exists() {
+            fail!("Item path does not exist.");
         }
 
-        if !move_ext_filesystems {
-            fail!("Failed to move item to trash: {}\nHelp: Item may be located on another drive, try with '--move-ext-filesystems'.", err);
-        }
-        
-        debug!("Falling back to copying.");
-
-        if let Some(size_limit) = size_limit_move_ext_filesystems {
-            debug!("Size limit was provided: {}", human_readable_size(size_limit));
-            debug!("Computing size of the item to remove...");
-
-            let details = get_fs_details(&path).unwrap_or_else(|err|
-                fail!("Failed to compute size of item before sending it to the trash: {}", err)
-            );
-
-            if details.size > size_limit {
-                fail!(
-                    "This item ({}) is larger than the provided size limit ({}).",
-                    human_readable_size(details.size),
-                    human_readable_size(size_limit)
-                );
+        if *permanently {
+            match fs::remove_dir_all(&path) {
+                Err(err) => fail!("Failed to permanently remove item: {}", err),
+                Ok(()) => return
             }
         }
 
-        move_item_pbr(&path, &trash_item_path).unwrap_or_else(|err|
-            fail!("Failed to move item to trash (using copying fallback): {}", err)
-        )
-    }
+        let filename = path.file_name().unwrap_or_else(|| fail!("Specified item path has no file name"));
+        let filename = match filename.to_str() {
+            Some(str) => str.to_string(),
+            None => if *allow_invalid_utf8_item_names {
+                filename.to_string_lossy().to_string()
+            } else {
+                fail!("Specified item does not have a valid UTF-8 file name")
+            }
+        };
 
-    let mut rename_errors = 0;
+        let trash_item = TrashItem::new_now(filename.to_string());
 
-    while let Err(err) = move_transferred_trash_item(&trash_item) {
-        rename_errors += 1;
+        debug!("Moving item to trash under name '{}'...", trash_item.trash_filename());
 
-        debug!("Failed to rename transferred item in trash (try n°{}): {}", rename_errors, err);
+        let trash_item_path = transfer_trash_item_path(&trash_item);
 
-        if rename_errors == 5 {
-            fail!("Failed to rename transferred item in trash after {} tries: {}", rename_errors, err);
+        if !TRASH_TRANSFER_DIR.exists() {
+            fs::create_dir_all(TRASH_TRANSFER_DIR.as_path()).unwrap_or_else(|err|
+                fail!("Failed to create trash's transfer directory: {}", err)
+            );
+        }
+
+        if let Err(err) = fs::rename(&path, &trash_item_path) {
+            debug!("Renaming failed: {:?}", err);
+            
+            if err.kind() != ErrorKind::Other {
+                fail!("An error occured while trying to move item to trash: {}", err);
+            }
+
+            if !move_ext_filesystems {
+                fail!("Failed to move item to trash: {}\nHelp: Item may be located on another drive, try with '--move-ext-filesystems'.", err);
+            }
+            
+            debug!("Falling back to copying.");
+
+            if let Some(size_limit) = size_limit_move_ext_filesystems {
+                debug!("Size limit was provided: {}", human_readable_size(size_limit));
+                debug!("Computing size of the item to remove...");
+
+                let details = get_fs_details(&path).unwrap_or_else(|err|
+                    fail!("Failed to compute size of item before sending it to the trash: {}", err)
+                );
+
+                if details.size > size_limit {
+                    fail!(
+                        "This item ({}) is larger than the provided size limit ({}).",
+                        human_readable_size(details.size),
+                        human_readable_size(size_limit)
+                    );
+                }
+            }
+
+            move_item_pbr(&path, &trash_item_path).unwrap_or_else(|err|
+                fail!("Failed to move item to trash (using copying fallback): {}", err)
+            )
+        }
+
+        let mut rename_errors = 0;
+
+        while let Err(err) = move_transferred_trash_item(&trash_item) {
+            rename_errors += 1;
+
+            debug!("Failed to rename transferred item in trash (try n°{}): {}", rename_errors, err);
+
+            if rename_errors == 5 {
+                fail!("Failed to rename transferred item in trash after {} tries: {}", rename_errors, err);
+            }
         }
     }
 }
