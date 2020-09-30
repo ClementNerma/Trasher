@@ -1,4 +1,4 @@
-use clap::{Clap, crate_version};
+use clap::{crate_version, Clap};
 use std::path::PathBuf;
 
 lazy_static! {
@@ -32,14 +32,18 @@ pub enum Action {
     #[clap(name = "rm", about = "Move an item to the trash")]
     Remove(MoveToTrash),
 
-    #[clap(name = "unrm", alias = "restore", about = "Restore an item from the trash")]
+    #[clap(
+        name = "unrm",
+        alias = "restore",
+        about = "Restore an item from the trash"
+    )]
     Restore(RestoreItem),
 
     #[clap(name = "drop", about = "Permanently delete an item from the trash")]
     Drop(DropItem),
 
     #[clap(name = "clear", about = "Permanently delete all items in the trash")]
-    Clear(EmptyTrash)
+    Clear(EmptyTrash),
 }
 
 #[derive(Clap)]
@@ -47,8 +51,12 @@ pub struct ListTrashItems {
     #[clap(long, about = "Only list occurrences of items with a specific name")]
     pub name: Option<String>,
 
-    #[clap(short, long, about = "Show details (size, number of files and directories)")]
-    pub details: bool
+    #[clap(
+        short,
+        long,
+        about = "Show details (size, number of files and directories)"
+    )]
+    pub details: bool,
 }
 
 #[derive(Clap)]
@@ -59,13 +67,28 @@ pub struct MoveToTrash {
     #[clap(short, long, about = "Delete the items permanently")]
     pub permanently: bool,
 
-    #[clap(short, long, conflicts_with="permanently", about = "For external filesystems, move the items to the main filesystem's trash directory")]
+    #[clap(
+        short,
+        long,
+        conflicts_with = "permanently",
+        about = "For external filesystems, move the items to the main filesystem's trash directory"
+    )]
     pub move_ext_filesystems: bool,
 
-    #[clap(short, long, requires="move-ext-filesystems", about = "Only apply '--move-ext-filesystems' if the items' size is lower or equal to the provided one")]
+    #[clap(
+        short,
+        long,
+        requires = "move-ext-filesystems",
+        about = "Only apply '--move-ext-filesystems' if the items' size is lower or equal to the provided one"
+    )]
     pub size_limit_move_ext_filesystems: Option<String>,
 
-    #[clap(short, long, conflicts_with="permanently", about = "Do not fail when encoutering invalid UTF-8 file names")]
+    #[clap(
+        short,
+        long,
+        conflicts_with = "permanently",
+        about = "Do not fail when encoutering invalid UTF-8 file names"
+    )]
     pub allow_invalid_utf8_item_names: bool,
 }
 
@@ -74,17 +97,29 @@ pub struct RestoreItem {
     #[clap(about = "Name of the item to restore")]
     pub filename: String,
 
-    #[clap(long, parse(from_os_str), about = "Destination path (defaults to the current directory)")]
+    #[clap(
+        long,
+        parse(from_os_str),
+        about = "Destination path (defaults to the current directory)"
+    )]
     pub to: Option<PathBuf>,
 
-    #[clap(long, about = "ID of the item to restore in case multiple exist with the same name")]
+    #[clap(
+        long,
+        about = "ID of the item to restore in case multiple exist with the same name"
+    )]
     pub id: Option<String>,
 
-    #[clap(short, long, conflicts_with="permanently", about = "For external filesystems, move the item from the main filesystem's trash directory")]
+    #[clap(
+        short,
+        long,
+        conflicts_with = "permanently",
+        about = "For external filesystems, move the item from the main filesystem's trash directory"
+    )]
     pub move_ext_filesystems: bool,
 
     #[clap(short, long, about = "Overwrite target path if it already exists")]
-    pub force: bool
+    pub force: bool,
 }
 
 #[derive(Clap)]
@@ -92,9 +127,12 @@ pub struct DropItem {
     #[clap(about = "Name of the item to permanently delete from the trash")]
     pub filename: String,
 
-    #[clap(long, about = "ID of the item to drop in case multiple exist with the same name")]
-    pub id: Option<String>
+    #[clap(
+        long,
+        about = "ID of the item to drop in case multiple exist with the same name"
+    )]
+    pub id: Option<String>,
 }
 
 #[derive(Clap)]
-pub struct EmptyTrash { }
+pub struct EmptyTrash {}

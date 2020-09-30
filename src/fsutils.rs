@@ -1,15 +1,15 @@
-use std::fs;
-use std::fmt;
-use std::path::{Path, PathBuf};
-use std::io::Result as IoResult;
-use std::error::Error;
-use std::rc::Rc;
-use std::cell::RefCell;
+use super::command::OPTS;
+use super::items::TrashItem;
 use fs_extra::dir::TransitProcessResult;
 use indicatif::{ProgressBar, ProgressStyle};
 use regex::Regex;
-use super::command::OPTS;
-use super::items::TrashItem;
+use std::cell::RefCell;
+use std::error::Error;
+use std::fmt;
+use std::fs;
+use std::io::Result as IoResult;
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 /// Name of the transfer directory in the trash
 pub const TRASH_TRANSFER_DIRNAME: &'static str = "#PARTIAL";
@@ -21,49 +21,66 @@ lazy_static! {
 
 /// List and parse all items in the trash
 pub fn list_trash_items(trash_path: impl AsRef<Path>) -> IoResult<Vec<TrashItem>> {
-    Ok(fs::read_dir(trash_path)?.collect::<Result<Vec<_>, _>>()?.iter().filter_map(|item| {
-        match item.file_name().into_string() {
-            Err(invalid_filename) => eprintln!("WARN: Trash item '{}' does not have a valid UTF-8 filename!", invalid_filename.to_string_lossy()),
+    Ok(fs::read_dir(trash_path)?
+        .collect::<Result<Vec<_>, _>>()?
+        .iter()
+        .filter_map(|item| {
+            match item.file_name().into_string() {
+                Err(invalid_filename) => eprintln!(
+                    "WARN: Trash item '{}' does not have a valid UTF-8 filename!",
+                    invalid_filename.to_string_lossy()
+                ),
 
-            Ok(filename) => {
-                if filename == TRASH_TRANSFER_DIRNAME {
-                    return None
-                }
+                Ok(filename) => {
+                    if filename == TRASH_TRANSFER_DIRNAME {
+                        return None;
+                    }
 
-                match TrashItem::decode(&filename) {
-                    Err(err) => {
-                        eprintln!("WARN: Trash item '{}' does not have a valid trash filename!", filename);
-                        super::debug!("Invalid trash item filename: {:?}", err);
-                    },
-                    Ok(trash_item) => return Some(trash_item)
+                    match TrashItem::decode(&filename) {
+                        Err(err) => {
+                            eprintln!(
+                                "WARN: Trash item '{}' does not have a valid trash filename!",
+                                filename
+                            );
+                            super::debug!("Invalid trash item filename: {:?}", err);
+                        }
+                        Ok(trash_item) => return Some(trash_item),
+                    }
                 }
             }
-        }
 
-        return None
-    }).collect())
+            return None;
+        })
+        .collect())
 }
 
 /// Find a specific item in the trash (panic if not found)
-pub fn expect_trash_item(trash_dir: impl AsRef<Path>, filename: &str, id: Option<&str>) -> IoResult<FoundTrashItems> {
-    let mut candidates: Vec<TrashItem> = list_trash_items(&trash_dir).unwrap()
+pub fn expect_trash_item(
+    trash_dir: impl AsRef<Path>,
+    filename: &str,
+    id: Option<&str>,
+) -> IoResult<FoundTrashItems> {
+    let mut candidates: Vec<TrashItem> = list_trash_items(&trash_dir)
+        .unwrap()
         .into_iter()
         .filter(|item| item.filename() == filename)
         .collect();
 
     if candidates.len() == 0 {
         super::fail!("Specified item was not found in the trash.");
-    }
-
-    else if candidates.len() > 1 {
+    } else if candidates.len() > 1 {
         match id {
             None => return Ok(FoundTrashItems::Multi(candidates)),
-            Some(id) => return Ok(FoundTrashItems::Single(
-                candidates
-                    .into_iter()
-                    .find(|c| c.id() == id)
-                    .unwrap_or_else(|| super::fail!("There is no trash item with the provided ID"))
-            ))
+            Some(id) => {
+                return Ok(FoundTrashItems::Single(
+                    candidates
+                        .into_iter()
+                        .find(|c| c.id() == id)
+                        .unwrap_or_else(|| {
+                            super::fail!("There is no trash item with the provided ID")
+                        }),
+                ))
+            }
         }
     }
 
@@ -82,7 +99,7 @@ pub fn get_fs_details(path: impl AsRef<Path>) -> IoResult<FSDetails> {
             is_dir,
             sub_directories: 0,
             sub_files: 0,
-            size: 0
+            size: 0,
         });
     }
 
@@ -92,7 +109,7 @@ pub fn get_fs_details(path: impl AsRef<Path>) -> IoResult<FSDetails> {
             is_dir: false,
             sub_directories: 0,
             sub_files: 0,
-            size: metadata.len()
+            size: metadata.len(),
         });
     }
 
@@ -101,7 +118,7 @@ pub fn get_fs_details(path: impl AsRef<Path>) -> IoResult<FSDetails> {
         is_dir: true,
         sub_directories: 0,
         sub_files: 0,
-        size: 0
+        size: 0,
     };
 
     for item in fs::read_dir(&path)? {
@@ -118,7 +135,9 @@ pub fn get_fs_details(path: impl AsRef<Path>) -> IoResult<FSDetails> {
 
 /// Get the trash path for an item that's going to be transferred to it
 pub fn transfer_trash_item_path(item: &TrashItem) -> PathBuf {
-    OPTS.trash_dir.join(TRASH_TRANSFER_DIRNAME).join(item.trash_filename())
+    OPTS.trash_dir
+        .join(TRASH_TRANSFER_DIRNAME)
+        .join(item.trash_filename())
 }
 
 pub fn complete_trash_item_path(item: &TrashItem) -> PathBuf {
@@ -127,7 +146,10 @@ pub fn complete_trash_item_path(item: &TrashItem) -> PathBuf {
 
 /// Move a partial item to the trash's main directory once the transfer is complete
 pub fn move_transferred_trash_item(item: &TrashItem) -> IoResult<()> {
-    fs::rename(transfer_trash_item_path(item), complete_trash_item_path(item))
+    fs::rename(
+        transfer_trash_item_path(item),
+        complete_trash_item_path(item),
+    )
 }
 
 /// Cleanup the transfer directory
@@ -141,7 +163,7 @@ pub fn cleanup_transfer_dir() -> IoResult<()> {
 
 /// Convert a size in bytes to a human-readable size
 pub fn human_readable_size(bytes: u64) -> String {
-    let names = [ "KiB", "MiB", "GiB", "TiB", "PiB", "EiB" ];
+    let names = ["KiB", "MiB", "GiB", "TiB", "PiB", "EiB"];
 
     if bytes < 1024 {
         return format!("{} B", bytes);
@@ -157,13 +179,17 @@ pub fn human_readable_size(bytes: u64) -> String {
         }
     }
 
-    return format!("{:.2} {}", bytes as f64 / compare as f64, names.last().unwrap());
+    return format!(
+        "{:.2} {}",
+        bytes as f64 / compare as f64,
+        names.last().unwrap()
+    );
 }
 
 lazy_static! {
-    static ref PARSE_SIZE_STR: Regex = Regex::new(
-        "^(?i)(?P<intqty>\\d+)(?:\\.(?P<decqty>\\d+))?(?P<unit>[BKMGTPE])(?:i?B)?$"
-    ).unwrap();
+    static ref PARSE_SIZE_STR: Regex =
+        Regex::new("^(?i)(?P<intqty>\\d+)(?:\\.(?P<decqty>\\d+))?(?P<unit>[BKMGTPE])(?:i?B)?$")
+            .unwrap();
 }
 
 /// Convert a human-readable size back to a number of bytes
@@ -173,7 +199,11 @@ pub fn parse_human_readable_size(size: &str) -> Result<u64, &'static str> {
     let int = captured["intqty"].parse::<u64>().unwrap();
     let dec = captured.name("decqty");
 
-    let unit_char = captured["unit"].chars().next().unwrap().to_ascii_uppercase();
+    let unit_char = captured["unit"]
+        .chars()
+        .next()
+        .unwrap()
+        .to_ascii_uppercase();
     let unit_size = 1024u64.pow("BKMGTPE".chars().position(|c| c == unit_char).unwrap() as u32);
 
     if dec.is_some() && unit_size == 1 {
@@ -187,11 +217,11 @@ pub fn parse_human_readable_size(size: &str) -> Result<u64, &'static str> {
 
             let dec_num = dec.parse::<u64>().unwrap();
             let unit_divider = 10u64.pow(dec.len() as u32);
-            
+
             if unit_divider.to_string().len() > unit_size.to_string().len() {
                 return Err("Too many decimals for this unit, would give decimal bytes");
             }
-            
+
             unit_size * dec_num / unit_divider
         }
     };
@@ -220,9 +250,14 @@ pub fn move_item_pbr(path: &Path, target: &Path) -> Result<(), Box<dyn Error>> {
     if path.metadata()?.is_file() {
         let file_name = path.file_name().unwrap().to_string_lossy();
 
-        fs_extra::file::move_file_with_progress(path, target, &fs_extra::file::CopyOptions::new(), |tp| {
-            update_pbr(tp.copied_bytes, tp.total_bytes, &file_name);
-        })?;
+        fs_extra::file::move_file_with_progress(
+            path,
+            target,
+            &fs_extra::file::CopyOptions::new(),
+            |tp| {
+                update_pbr(tp.copied_bytes, tp.total_bytes, &file_name);
+            },
+        )?;
     } else {
         let mut config = fs_extra::dir::CopyOptions::new();
         config.copy_inside = true;
@@ -235,14 +270,14 @@ pub fn move_item_pbr(path: &Path, target: &Path) -> Result<(), Box<dyn Error>> {
     let mut pbr = pbr.borrow_mut();
     let pbr = pbr.as_mut();
     pbr.map(|pbr| pbr.finish_with_message("Moving complete."));
-    
+
     return Ok(());
 }
 
 /// Trash items found with the [`expect_trash_item`] function
 pub enum FoundTrashItems {
     Single(TrashItem),
-    Multi(Vec<TrashItem>)
+    Multi(Vec<TrashItem>),
 }
 
 /// Details on a filesystem item returned by the [`get_fs_details`] function
@@ -251,7 +286,7 @@ pub struct FSDetails {
     pub is_dir: bool,
     pub sub_directories: u64,
     pub sub_files: u64,
-    pub size: u64
+    pub size: u64,
 }
 
 impl fmt::Display for FSDetails {
@@ -259,7 +294,13 @@ impl fmt::Display for FSDetails {
         write!(
             f,
             " | [{}] Size: {}{}",
-            if self.is_symlink { "Symlink" } else if self.is_dir { "Directory" } else { "File" },
+            if self.is_symlink {
+                "Symlink"
+            } else if self.is_dir {
+                "Directory"
+            } else {
+                "File"
+            },
             human_readable_size(self.size),
             if self.is_dir {
                 format!(
@@ -268,7 +309,9 @@ impl fmt::Display for FSDetails {
                     self.sub_directories,
                     self.sub_files
                 )
-            } else { "".to_string() }
+            } else {
+                "".to_string()
+            }
         )
     }
 }

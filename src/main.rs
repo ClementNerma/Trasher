@@ -3,14 +3,15 @@
 
 mod actions;
 mod command;
-mod items;
 mod fsutils;
+mod items;
 
-#[macro_use] extern crate lazy_static;
+#[macro_use]
+extern crate lazy_static;
 
-use std::fs;
-use fsutils::cleanup_transfer_dir;
 use command::*;
+use fsutils::cleanup_transfer_dir;
+use std::fs;
 
 #[macro_export]
 macro_rules! fail {
@@ -20,7 +21,7 @@ macro_rules! fail {
     }}
 }
 
-#[macro_export]   
+#[macro_export]
 macro_rules! debug {
     ($message: expr$(,$params: expr)*) => { if OPTS.verbose { println!(concat!("[DEBUG] ", $message), $($params,)*); } }
 }
@@ -41,7 +42,7 @@ fn main() {
         Action::Remove(action) => actions::remove(action),
         Action::Drop(action) => actions::drop(action),
         Action::Restore(action) => actions::restore(action),
-        Action::Clear(action) => actions::clear(action)
+        Action::Clear(action) => actions::clear(action),
     }
 
     if !OPTS.no_cleanup {
