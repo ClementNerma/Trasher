@@ -75,6 +75,7 @@ pub fn remove(action: &MoveToTrash) {
     let MoveToTrash {
         paths,
         permanently,
+        ignore,
         move_ext_filesystems,
         size_limit_move_ext_filesystems,
         allow_invalid_utf8_item_names,
@@ -100,6 +101,10 @@ pub fn remove(action: &MoveToTrash) {
         debug!("Checking if item exists...");
 
         if !path.exists() {
+            if *ignore {
+                return;
+            }
+
             fail!("Item path does not exist.");
         }
 

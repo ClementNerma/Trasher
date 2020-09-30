@@ -70,6 +70,13 @@ pub struct MoveToTrash {
     #[clap(
         short,
         long,
+        about = "Do nothing if the item doesn't exist instead of failing"
+    )]
+    pub ignore: bool,
+
+    #[clap(
+        short,
+        long,
         conflicts_with = "permanently",
         about = "For external filesystems, move the items to the main filesystem's trash directory"
     )]
