@@ -102,7 +102,7 @@ pub fn remove(action: &MoveToTrash) {
 
         if !path.exists() {
             if *ignore {
-                return;
+                continue;
             }
 
             fail!("Item path does not exist.");
@@ -117,7 +117,7 @@ pub fn remove(action: &MoveToTrash) {
 
             match deletion_result {
                 Err(err) => fail!("Failed to permanently remove item: {}", err),
-                Ok(()) => return,
+                Ok(()) => continue,
             }
         }
 
