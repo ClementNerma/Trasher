@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 /// Name of the transfer directory in the trash
-pub const TRASH_TRANSFER_DIRNAME: &'static str = "#PARTIAL";
+pub const TRASH_TRANSFER_DIRNAME: &str = "#PARTIAL";
 
 lazy_static! {
     /// Path to the transfer directory in the trash
@@ -49,7 +49,7 @@ pub fn list_trash_items(trash_path: impl AsRef<Path>) -> IoResult<Vec<TrashItem>
                 }
             }
 
-            return None;
+            None
         })
         .collect())
 }
@@ -66,7 +66,7 @@ pub fn expect_trash_item(
         .filter(|item| item.filename() == filename)
         .collect();
 
-    if candidates.len() == 0 {
+    if candidates.is_empty() {
         super::fail!("Specified item was not found in the trash.");
     } else if candidates.len() > 1 {
         match id {
@@ -84,7 +84,7 @@ pub fn expect_trash_item(
         }
     }
 
-    return Ok(FoundTrashItems::Single(candidates.remove(0)));
+    Ok(FoundTrashItems::Single(candidates.remove(0)))
 }
 
 /// Get details on a filesystem item
@@ -130,7 +130,7 @@ pub fn get_fs_details(path: impl AsRef<Path>) -> IoResult<FSDetails> {
         details.size += item_details.size;
     }
 
-    return Ok(details);
+    Ok(details)
 }
 
 /// Get the trash path for an item that's going to be transferred to it
@@ -269,9 +269,12 @@ pub fn move_item_pbr(path: &Path, target: &Path) -> Result<(), Box<dyn Error>> {
 
     let mut pbr = pbr.borrow_mut();
     let pbr = pbr.as_mut();
-    pbr.map(|pbr| pbr.finish_with_message("Moving complete."));
 
-    return Ok(());
+    if let Some(pbr) = pbr {
+        pbr.finish_with_message("Moving complete.")
+    }
+
+    Ok(())
 }
 
 /// Trash items found with the [`expect_trash_item`] function

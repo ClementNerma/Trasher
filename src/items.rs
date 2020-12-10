@@ -13,7 +13,7 @@ lazy_static! {
     ).unwrap();
 }
 
-static DATETIME_FORMAT: &'static str = "%Y.%m.%d_%Hh%Mm%Ss.%f%z";
+static DATETIME_FORMAT: &str = "%Y.%m.%d_%Hh%Mm%Ss.%f%z";
 
 pub struct TrashItem {
     id: String,
@@ -88,12 +88,12 @@ impl TrashItem {
         let decoded = Self::new(captured["filename"].to_string(), timezoned);
 
         if decoded.id != captured["id"] {
-            return Err(TrashItemDecodingError::IDDoesNotMatch {
+            Err(TrashItemDecodingError::IDDoesNotMatch {
                 found: captured["id"].to_string(),
                 expected: decoded.id,
-            });
+            })
         } else {
-            return Ok(decoded);
+            Ok(decoded)
         }
     }
 }
@@ -127,7 +127,7 @@ impl fmt::Debug for TrashItemDecodingError {
                 Self::InvalidDateTime(err) =>
                     format!("Invalid date/time in file name: {:?}", err.to_string()),
                 Self::TimezoneDecodingError =>
-                    format!("Date/time is invalid for the local timezone"),
+                    "Date/time is invalid for the local timezone".to_string(),
                 Self::IDDoesNotMatch { found, expected } =>
                     format!("Found ID '{}' but expected one was '{}'", found, expected),
             }
