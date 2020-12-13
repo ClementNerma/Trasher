@@ -57,6 +57,8 @@ You can for instance put the trash in your home directory:
 trasher -ct ~/.trasher <action>
 ```
 
+To delete an item permanently, add the `--permanently` or `-p` option.
+
 ## Actions
 
 There are several actions available:
