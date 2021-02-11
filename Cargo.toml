@@ -10,10 +10,10 @@ repository = "https://github.com/ClementNerma/Trasher"
 
 [dependencies]
 clap = "3.0.0-beta.2"
-chrono = "0.4.12"
-regex = "1.3.9"
+chrono = "0.4.19"
+regex = "1.4.3"
 lazy_static = "1.4.0"
-crc-any = "2.3.3"
+crc-any = "2.3.5"
 base64 = "0.13.0"
 fs_extra = "1.2.0"
 indicatif = "0.15.0"
