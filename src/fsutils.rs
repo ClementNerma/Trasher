@@ -59,7 +59,7 @@ pub fn expect_trash_item(
     trash_dir: impl AsRef<Path>,
     filename: &str,
     id: Option<&str>,
-) -> IoResult<FoundTrashItems> {
+) -> FoundTrashItems {
     let mut candidates: Vec<TrashItem> = list_trash_items(&trash_dir)
         .unwrap()
         .into_iter()
@@ -70,21 +70,21 @@ pub fn expect_trash_item(
         super::fail!("Specified item was not found in the trash.");
     } else if candidates.len() > 1 {
         match id {
-            None => return Ok(FoundTrashItems::Multi(candidates)),
+            None => return FoundTrashItems::Multi(candidates),
             Some(id) => {
-                return Ok(FoundTrashItems::Single(
+                return FoundTrashItems::Single(
                     candidates
                         .into_iter()
                         .find(|c| c.id() == id)
                         .unwrap_or_else(|| {
                             super::fail!("There is no trash item with the provided ID")
                         }),
-                ))
+                )
             }
         }
     }
 
-    Ok(FoundTrashItems::Single(candidates.remove(0)))
+    FoundTrashItems::Single(candidates.remove(0))
 }
 
 /// Get details on a filesystem item

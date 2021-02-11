@@ -223,7 +223,7 @@ pub fn drop(action: &DropItem) {
 
     debug!("Listing trash items...");
 
-    match expect_trash_item(&OPTS.trash_dir, &filename, id.as_deref()).unwrap() {
+    match expect_trash_item(&OPTS.trash_dir, &filename, id.as_deref()) {
         FoundTrashItems::Single(item) => {
             let item_path = complete_trash_item_path(&item);
 
@@ -253,7 +253,7 @@ pub fn path_of(action: &GetItemPath) {
 
     debug!("Listing trash items...");
 
-    match expect_trash_item(&OPTS.trash_dir, &filename, id.as_deref()).unwrap() {
+    match expect_trash_item(&OPTS.trash_dir, &filename, id.as_deref()) {
         FoundTrashItems::Single(item) => {
             println!("{}", complete_trash_item_path(&item).to_string_lossy())
         }
@@ -279,7 +279,7 @@ pub fn restore(action: &RestoreItem) {
 
     debug!("Listing trash items...");
 
-    match expect_trash_item(&OPTS.trash_dir, &filename, id.as_deref()).unwrap() {
+    match expect_trash_item(&OPTS.trash_dir, &filename, id.as_deref()) {
         FoundTrashItems::Single(item) => {
             let item_path = complete_trash_item_path(&item);
             let target_path = to
