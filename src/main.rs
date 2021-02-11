@@ -41,6 +41,7 @@ fn main() {
         Action::List(action) => actions::list(action),
         Action::Remove(action) => actions::remove(action),
         Action::Drop(action) => actions::drop(action),
+        Action::PathOf(action) => actions::path_of(action),
         Action::Restore(action) => actions::restore(action),
         Action::Clear(action) => actions::clear(action),
     }

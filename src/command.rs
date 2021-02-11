@@ -42,6 +42,12 @@ pub enum Action {
     #[clap(name = "drop", about = "Permanently delete an item from the trash")]
     Drop(DropItem),
 
+    #[clap(
+        name = "path-of",
+        about = "Get the path of an item inside the trash directory"
+    )]
+    PathOf(GetItemPath),
+
     #[clap(name = "clear", about = "Permanently delete all items in the trash")]
     Clear(EmptyTrash),
 }
@@ -133,6 +139,18 @@ pub struct DropItem {
     #[clap(
         long,
         about = "ID of the item to drop in case multiple exist with the same name"
+    )]
+    pub id: Option<String>,
+}
+
+#[derive(Clap)]
+pub struct GetItemPath {
+    #[clap(about = "Name of the item to get the path of in the trash")]
+    pub filename: String,
+
+    #[clap(
+        long,
+        about = "ID of the item to get in case multiple exist with the same name"
     )]
     pub id: Option<String>,
 }

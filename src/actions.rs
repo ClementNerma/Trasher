@@ -248,6 +248,26 @@ pub fn drop(action: &DropItem) {
     }
 }
 
+pub fn path_of(action: &GetItemPath) {
+    let GetItemPath { filename, id } = action;
+
+    debug!("Listing trash items...");
+
+    match expect_trash_item(&OPTS.trash_dir, &filename, id.as_deref()).unwrap() {
+        FoundTrashItems::Single(item) => {
+            println!("{}", complete_trash_item_path(&item).to_string_lossy())
+        }
+
+        FoundTrashItems::Multi(candidates) => println!(
+            "Multiple items with this filename were found in the trash:{}",
+            candidates
+                .iter()
+                .map(|c| format!("\n* {}", c))
+                .collect::<String>()
+        ),
+    }
+}
+
 pub fn restore(action: &RestoreItem) {
     let RestoreItem {
         filename,
