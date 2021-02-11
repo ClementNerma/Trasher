@@ -153,6 +153,13 @@ pub struct GetItemPath {
         about = "ID of the item to get in case multiple exist with the same name"
     )]
     pub id: Option<String>,
+
+    #[clap(
+        short,
+        long,
+        about = "Do not fail if the path contains invalid UTF-8 characters"
+    )]
+    pub allow_invalid_utf8_path: bool,
 }
 
 #[derive(Clap)]

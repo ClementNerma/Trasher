@@ -87,6 +87,24 @@ pub fn expect_trash_item(
     FoundTrashItems::Single(candidates.remove(0))
 }
 
+/// Find a specific item in the trash, fail if none is found or if multiple candidates are found
+pub fn expect_single_trash_item(
+    trash_dir: impl AsRef<Path>,
+    filename: &str,
+    id: Option<&str>,
+) -> TrashItem {
+    match expect_trash_item(trash_dir, filename, id) {
+        FoundTrashItems::Single(item) => item,
+        FoundTrashItems::Multi(candidates) => super::fail!(
+            "Multiple items with this filename were found in the trash:{}",
+            candidates
+                .iter()
+                .map(|c| format!("\n* {}", c))
+                .collect::<String>()
+        ),
+    }
+}
+
 /// Get details on a filesystem item
 pub fn get_fs_details(path: impl AsRef<Path>) -> IoResult<FSDetails> {
     let metadata = fs::metadata(&path)?;

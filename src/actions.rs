@@ -223,48 +223,44 @@ pub fn drop(action: &DropItem) {
 
     debug!("Listing trash items...");
 
-    match expect_trash_item(&OPTS.trash_dir, &filename, id.as_deref()) {
-        FoundTrashItems::Single(item) => {
-            let item_path = complete_trash_item_path(&item);
+    let item = expect_single_trash_item(&OPTS.trash_dir, filename, id.as_deref());
+    let item_path = complete_trash_item_path(&item);
 
-            debug!("Permanently removing item from trash...");
+    debug!("Permanently removing item from trash...");
 
-            if let Err(err) = fs::remove_dir_all(&item_path) {
-                fail!(
-                    "Failed to remove item '{}' from trash: {}",
-                    item.filename(),
-                    err
-                );
-            }
-        }
-
-        FoundTrashItems::Multi(candidates) => println!(
-            "Multiple items with this filename were found in the trash:{}",
-            candidates
-                .iter()
-                .map(|c| format!("\n* {}", c))
-                .collect::<String>()
-        ),
+    if let Err(err) = fs::remove_dir_all(&item_path) {
+        fail!(
+            "Failed to remove item '{}' from trash: {}",
+            item.filename(),
+            err
+        );
     }
 }
 
 pub fn path_of(action: &GetItemPath) {
-    let GetItemPath { filename, id } = action;
+    let GetItemPath {
+        filename,
+        id,
+        allow_invalid_utf8_path,
+    } = action;
 
     debug!("Listing trash items...");
 
-    match expect_trash_item(&OPTS.trash_dir, &filename, id.as_deref()) {
-        FoundTrashItems::Single(item) => {
-            println!("{}", complete_trash_item_path(&item).to_string_lossy())
-        }
+    let item = expect_single_trash_item(&OPTS.trash_dir, filename, id.as_deref());
+    let item_path = complete_trash_item_path(&item);
 
-        FoundTrashItems::Multi(candidates) => println!(
-            "Multiple items with this filename were found in the trash:{}",
-            candidates
-                .iter()
-                .map(|c| format!("\n* {}", c))
-                .collect::<String>()
-        ),
+    match item_path.to_str() {
+        Some(path) => println!("{}", path),
+        None => {
+            if *allow_invalid_utf8_path {
+                println!("{}", item_path.to_string_lossy())
+            } else {
+                fail!(
+                    "Path contains invalid UTF-8 characters (lossy: {})",
+                    item_path.to_string_lossy()
+                );
+            }
+        }
     }
 }
 
