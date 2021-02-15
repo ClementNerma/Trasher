@@ -102,10 +102,10 @@ impl fmt::Display for TrashItem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "[ ID: {} ] {} (removed on: {})",
+            "| Removed on: {} | ID: {} | {}",
+            self.datetime.to_rfc2822(),
             self.id,
-            self.filename,
-            self.datetime.to_rfc2822()
+            self.filename
         )
     }
 }
