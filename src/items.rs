@@ -49,9 +49,9 @@ impl TrashItem {
         &self.filename
     }
 
-    // pub fn datetime(&self) -> &DateTime<Local> {
-    //     &self.datetime
-    // }
+    pub fn datetime(&self) -> &DateTime<Local> {
+        &self.datetime
+    }
 
     pub fn trash_filename(&self) -> String {
         let extension = match PathBuf::from(&self.filename).extension() {

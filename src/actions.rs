@@ -20,6 +20,8 @@ pub fn list(action: &ListTrashItems) {
             .collect();
     }
 
+    items.sort_by(|a, b| a.datetime().cmp(b.datetime()));
+    
     match items.len() {
         0 => println!(
             "{}",
