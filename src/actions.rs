@@ -21,7 +21,7 @@ pub fn list(action: &ListTrashItems) {
     }
 
     items.sort_by(|a, b| a.datetime().cmp(b.datetime()));
-    
+
     match items.len() {
         0 => println!(
             "{}",
@@ -137,7 +137,18 @@ pub fn remove(action: &MoveToTrash) {
             }
         };
 
-        let trash_item = TrashItem::new_now(filename.to_string());
+        let item_metadata = path.metadata().unwrap_or_else(|err| {
+            fail!(
+                "Failed to get metadata for item at path '{}': {}",
+                path.to_string_lossy(),
+                err
+            )
+        });
+
+        let trash_item = TrashItem::new_now(
+            filename.to_string(),
+            Some(item_metadata.file_type()),
+        );
 
         debug!(
             "Moving item to trash under name '{}'...",

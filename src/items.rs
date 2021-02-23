@@ -4,8 +4,8 @@ use chrono::LocalResult;
 use crc_any::CRC;
 use regex::Regex;
 use std::fmt;
-use std::path::PathBuf;
 use std::str;
+use std::{fs::FileType, path::PathBuf};
 
 lazy_static! {
     static ref DECODER: Regex = Regex::new(
@@ -19,19 +19,21 @@ pub struct TrashItem {
     id: String,
     filename: String,
     datetime: DateTime<Local>,
+    file_type: Option<FileType>,
 }
 
 impl TrashItem {
-    pub fn new(filename: String, datetime: DateTime<Local>) -> Self {
+    pub fn new(filename: String, datetime: DateTime<Local>, file_type: Option<FileType>) -> Self {
         Self {
             id: Self::hash(datetime),
             filename,
             datetime,
+            file_type,
         }
     }
 
-    pub fn new_now(filename: String) -> Self {
-        Self::new(filename, Local::now())
+    pub fn new_now(filename: String, file_type: Option<FileType>) -> Self {
+        Self::new(filename, Local::now(), file_type)
     }
 
     pub fn hash(datetime: DateTime<Local>) -> String {
@@ -69,7 +71,10 @@ impl TrashItem {
         )
     }
 
-    pub fn decode(final_name: &str) -> Result<TrashItem, TrashItemDecodingError> {
+    pub fn decode(
+        final_name: &str,
+        file_type: Option<FileType>,
+    ) -> Result<TrashItem, TrashItemDecodingError> {
         let captured = DECODER
             .captures(final_name)
             .ok_or(TrashItemDecodingError::InvalidFilenameFormat)?;
@@ -85,7 +90,7 @@ impl TrashItem {
             }
         };
 
-        let decoded = Self::new(captured["filename"].to_string(), timezoned);
+        let decoded = Self::new(captured["filename"].to_string(), timezoned, file_type);
 
         if decoded.id != captured["id"] {
             Err(TrashItemDecodingError::IDDoesNotMatch {
@@ -100,11 +105,27 @@ impl TrashItem {
 
 impl fmt::Display for TrashItem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let file_type = self.file_type.map(|file_type| {
+            format!(
+                "[{}]",
+                if file_type.is_dir() {
+                    'D'
+                } else if file_type.is_file() {
+                    'f'
+                } else if file_type.is_symlink() {
+                    'S'
+                } else {
+                    '?'
+                }
+            )
+        });
+
         write!(
             f,
-            "| Removed on: {} | ID: {} | {}",
+            "| Removed on: {} | ID: {} | {} {}",
             self.datetime.to_rfc2822(),
             self.id,
+            file_type.unwrap_or_else(|| "-".to_string()),
             self.filename
         )
     }

@@ -36,7 +36,7 @@ pub fn list_trash_items(trash_path: impl AsRef<Path>) -> IoResult<Vec<TrashItem>
                         return None;
                     }
 
-                    match TrashItem::decode(&filename) {
+                    match TrashItem::decode(&filename, Some(item.file_type().unwrap())) {
                         Err(err) => {
                             eprintln!(
                                 "WARN: Trash item '{}' does not have a valid trash filename!",
