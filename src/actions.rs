@@ -85,7 +85,7 @@ pub fn remove(action: &MoveToTrash) {
 
     let size_limit_move_ext_filesystems =
         size_limit_move_ext_filesystems.as_ref().map(|size_limit| {
-            parse_human_readable_size(&size_limit).unwrap_or_else(|err| {
+            parse_human_readable_size(size_limit).unwrap_or_else(|err| {
                 fail!(
                     "Invalid size limit provided for externals filesystems' items moving: {}",
                     err
@@ -145,10 +145,7 @@ pub fn remove(action: &MoveToTrash) {
             )
         });
 
-        let trash_item = TrashItem::new_now(
-            filename.to_string(),
-            Some(item_metadata.file_type()),
-        );
+        let trash_item = TrashItem::new_now(filename.to_string(), Some(item_metadata.file_type()));
 
         debug!(
             "Moving item to trash under name '{}'...",
@@ -288,7 +285,7 @@ pub fn restore(action: &RestoreItem) {
 
     debug!("Listing trash items...");
 
-    match expect_trash_item(&OPTS.trash_dir, &filename, id.as_deref()) {
+    match expect_trash_item(&OPTS.trash_dir, filename, id.as_deref()) {
         FoundTrashItems::Single(item) => {
             let item_path = complete_trash_item_path(&item);
             let target_path = to
