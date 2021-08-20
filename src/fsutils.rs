@@ -262,7 +262,7 @@ pub fn move_item_pbr(path: &Path, target: &Path) -> Result<(), Box<dyn Error>> {
         });
 
         pbr.set_position(copied);
-        pbr.set_message(item_name);
+        pbr.set_message(item_name.to_string());
     };
 
     if path.metadata()?.is_file() {
