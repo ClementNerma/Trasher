@@ -102,6 +102,10 @@ pub fn remove(action: &MoveToTrash) {
 
         debug!("Checking if item exists...");
 
+        if is_dangerous_path(&path) {
+            fail!("Removing this path is too dangerous, operation aborted.");
+        }
+
         if !path.exists() {
             if *ignore {
                 continue;

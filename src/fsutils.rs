@@ -5,9 +5,11 @@ use indicatif::{ProgressBar, ProgressStyle};
 use regex::Regex;
 use std::cell::RefCell;
 use std::error::Error;
+use std::ffi::OsStr;
 use std::fmt;
 use std::fs;
 use std::io::Result as IoResult;
+use std::path::Component;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
@@ -334,5 +336,31 @@ impl fmt::Display for FSDetails {
                 "".to_string()
             }
         )
+    }
+}
+
+// Check if a path is dangerous to delete
+pub fn is_dangerous_path(path: &Path) -> bool {
+    let mut components = path.components();
+
+    match (
+        components.next(),
+        components.next(),
+        components.next(),
+        components.next(),
+    ) {
+        // The root directory (/)
+        (Some(Component::RootDir), None, None, None) => true,
+
+        // Root directories (/home, /bin, etc.)
+        (Some(Component::RootDir), Some(_), None, None) => true,
+
+        // Home directories (/home/username, etc.)
+        (Some(Component::RootDir), Some(Component::Normal(dir)), Some(_), None) => {
+            dir == OsStr::new("home")
+        }
+
+        // Non-dangerous paths
+        _ => false,
     }
 }
