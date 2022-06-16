@@ -96,7 +96,7 @@ pub fn remove(action: &MoveToTrash) {
     debug!("Going to remove {} item(s)...", paths.len());
 
     for (i, path) in paths.iter().enumerate() {
-        debug!("Treating item {} on {}...", i, paths.len());
+        debug!("Treating item {} on {}...", i + 1, paths.len());
 
         let path = PathBuf::from(path);
 
