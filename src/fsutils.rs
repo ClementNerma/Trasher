@@ -259,6 +259,7 @@ pub fn move_item_pbr(path: &Path, target: &Path) -> Result<(), Box<dyn Error>> {
             let pbr = ProgressBar::new(total);
             pbr.set_style(ProgressStyle::default_bar()
             .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+            .expect("Invalid progress bar template")
             .progress_chars("#>-"));
             pbr
         });
