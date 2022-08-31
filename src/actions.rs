@@ -167,15 +167,16 @@ pub fn remove(action: &MoveToTrash) {
         if let Err(err) = fs::rename(&path, &trash_item_path) {
             debug!("Renaming failed: {:?}", err);
 
-            if err.kind() != ErrorKind::Other {
+            // HACK: *MUST* be removed when this issue is resolved: https://github.com/rust-lang/rust/issues/86442
+            if err.kind().to_string() == "cross-device link or rename" {
+                if !move_ext_filesystems {
+                    fail!("Failed to move item to trash: {}\nHelp: Item may be located on another drive, try with '--move-ext-filesystems'.", err);
+                }
+            } else if err.kind() != ErrorKind::Other {
                 fail!(
                     "An error occured while trying to move item to trash: {}",
                     err
                 );
-            }
-
-            if !move_ext_filesystems {
-                fail!("Failed to move item to trash: {}\nHelp: Item may be located on another drive, try with '--move-ext-filesystems'.", err);
             }
 
             debug!("Falling back to copying.");
