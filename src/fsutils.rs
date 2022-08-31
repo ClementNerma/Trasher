@@ -199,11 +199,11 @@ pub fn human_readable_size(bytes: u64) -> String {
         }
     }
 
-    return format!(
+    format!(
         "{:.2} {}",
         bytes as f64 / compare as f64,
         names.last().unwrap()
-    );
+    )
 }
 
 lazy_static! {
