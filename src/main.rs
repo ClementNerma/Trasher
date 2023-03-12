@@ -6,9 +6,6 @@ mod command;
 mod fsutils;
 mod items;
 
-#[macro_use]
-extern crate lazy_static;
-
 use command::*;
 use fsutils::cleanup_transfer_dir;
 use std::fs;

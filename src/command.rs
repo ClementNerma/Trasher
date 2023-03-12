@@ -1,9 +1,8 @@
 use clap::{Parser, Subcommand};
+use once_cell::sync::Lazy;
 use std::path::PathBuf;
 
-lazy_static! {
-    pub static ref OPTS: Opts = Opts::parse();
-}
+pub static OPTS: Lazy<Opts> = Lazy::new(|| Opts::parse());
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
