@@ -2,6 +2,7 @@ use super::command::OPTS;
 use super::items::TrashItem;
 use fs_extra::dir::TransitProcessResult;
 use indicatif::{ProgressBar, ProgressStyle};
+use once_cell::sync::Lazy;
 use regex::Regex;
 use std::cell::RefCell;
 use std::error::Error;
@@ -16,10 +17,9 @@ use std::rc::Rc;
 /// Name of the transfer directory in the trash
 pub const TRASH_TRANSFER_DIRNAME: &str = "#PARTIAL";
 
-lazy_static! {
-    /// Path to the transfer directory in the trash
-    pub static ref TRASH_TRANSFER_DIR: PathBuf = OPTS.trash_dir.join(TRASH_TRANSFER_DIRNAME);
-}
+/// Path to the transfer directory in the trash
+pub static TRASH_TRANSFER_DIR: Lazy<PathBuf> =
+    Lazy::new(|| OPTS.trash_dir.join(TRASH_TRANSFER_DIRNAME));
 
 /// List and parse all items in the trash
 pub fn list_trash_items(trash_path: impl AsRef<Path>) -> IoResult<Vec<TrashItem>> {
@@ -206,11 +206,9 @@ pub fn human_readable_size(bytes: u64) -> String {
     )
 }
 
-lazy_static! {
-    static ref PARSE_SIZE_STR: Regex =
-        Regex::new("^(?i)(?P<intqty>\\d+)(?:\\.(?P<decqty>\\d+))?(?P<unit>[BKMGTPE])(?:i?B)?$")
-            .unwrap();
-}
+static PARSE_SIZE_STR: Lazy<Regex> = Lazy::new(|| {
+    Regex::new("^(?i)(?P<intqty>\\d+)(?:\\.(?P<decqty>\\d+))?(?P<unit>[BKMGTPE])(?:i?B)?$").unwrap()
+});
 
 /// Convert a human-readable size back to a number of bytes
 pub fn parse_human_readable_size(size: &str) -> Result<u64, &'static str> {

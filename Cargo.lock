@@ -522,7 +522,7 @@ dependencies = [
 
 [[package]]
 name = "trasher"
-version = "1.7.5"
+version = "1.7.6"
 dependencies = [
  "base64",
  "chrono",
@@ -530,7 +530,7 @@ dependencies = [
  "crc-any",
  "fs_extra",
  "indicatif",
- "lazy_static",
+ "once_cell",
  "regex",
 ]
 

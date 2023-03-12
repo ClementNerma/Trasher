@@ -3,16 +3,17 @@ use base64::Engine;
 use chrono::prelude::*;
 use chrono::LocalResult;
 use crc_any::CRC;
+use once_cell::sync::Lazy;
 use regex::Regex;
 use std::fmt;
 use std::str;
 use std::{fs::FileType, path::PathBuf};
 
-lazy_static! {
-    static ref DECODER: Regex = Regex::new(
+static DECODER: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
         "^(?P<filename>.*)\\s\\[@\\s(?P<datetime>.*)\\]\\s\\{(?P<id>[\\da-zA-Z_\\-]+)\\}(\\.[^\\.]*)?$"
-    ).unwrap();
-}
+    ).unwrap()
+});
 
 static DATETIME_FORMAT: &str = "%Y.%m.%d_%Hh%Mm%Ss.%f%z";
 
