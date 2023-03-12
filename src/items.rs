@@ -1,4 +1,5 @@
-use base64::{encode_config, URL_SAFE_NO_PAD};
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine;
 use chrono::prelude::*;
 use chrono::LocalResult;
 use crc_any::CRC;
@@ -40,7 +41,7 @@ impl TrashItem {
         let mut crc24 = CRC::crc24();
         crc24.digest(&datetime.timestamp().to_le_bytes());
         crc24.digest(&datetime.timestamp_subsec_nanos().to_le_bytes());
-        encode_config(crc24.get_crc_vec_le(), URL_SAFE_NO_PAD)
+        URL_SAFE_NO_PAD.encode(crc24.get_crc_vec_le())
     }
 
     pub fn id(&self) -> &str {

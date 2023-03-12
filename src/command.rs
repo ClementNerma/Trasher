@@ -1,4 +1,4 @@
-use clap::{Args, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 lazy_static! {
@@ -8,7 +8,7 @@ lazy_static! {
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
 pub struct Opts {
-    #[clap(short, long, parse(from_os_str))]
+    #[clap(short, long)]
     pub trash_dir: PathBuf,
 
     #[clap(short, long)]
@@ -26,33 +26,33 @@ pub struct Opts {
 
 #[derive(Subcommand)]
 pub enum Action {
-    #[clap(name = "ls", help = "List all items in the trash")]
+    #[clap(name = "ls", about = "List all items in the trash")]
     List(ListTrashItems),
 
-    #[clap(name = "rm", help = "Move an item to the trash")]
+    #[clap(name = "rm", about = "Move an item to the trash")]
     Remove(MoveToTrash),
 
     #[clap(
         name = "unrm",
         alias = "restore",
-        help = "Restore an item from the trash"
+        about = "Restore an item from the trash"
     )]
     Restore(RestoreItem),
 
-    #[clap(name = "drop", help = "Permanently delete an item from the trash")]
+    #[clap(name = "drop", about = "Permanently delete an item from the trash")]
     Drop(DropItem),
 
     #[clap(
         name = "path-of",
-        help = "Get the path of an item inside the trash directory"
+        about = "Get the path of an item inside the trash directory"
     )]
     PathOf(GetItemPath),
 
-    #[clap(name = "clear", help = "Permanently delete all items in the trash")]
+    #[clap(name = "clear", about = "Permanently delete all items in the trash")]
     Clear(EmptyTrash),
 }
 
-#[derive(Args)]
+#[derive(Parser)]
 pub struct ListTrashItems {
     #[clap(long, help = "Only list occurrences of items with a specific name")]
     pub name: Option<String>,
@@ -65,7 +65,7 @@ pub struct ListTrashItems {
     pub details: bool,
 }
 
-#[derive(Args)]
+#[derive(Parser)]
 pub struct MoveToTrash {
     #[clap(help = "Path of the items to move to the trash")]
     pub paths: Vec<String>,
@@ -102,16 +102,12 @@ pub struct MoveToTrash {
     pub allow_invalid_utf8_item_names: bool,
 }
 
-#[derive(Args)]
+#[derive(Parser)]
 pub struct RestoreItem {
     #[clap(help = "Name of the item to restore")]
     pub filename: String,
 
-    #[clap(
-        long,
-        parse(from_os_str),
-        help = "Destination path (defaults to the current directory)"
-    )]
+    #[clap(long, help = "Destination path (defaults to the current directory)")]
     pub to: Option<PathBuf>,
 
     #[clap(
@@ -131,7 +127,7 @@ pub struct RestoreItem {
     pub force: bool,
 }
 
-#[derive(Args)]
+#[derive(Parser)]
 pub struct DropItem {
     #[clap(help = "Name of the item to permanently delete from the trash")]
     pub filename: String,
@@ -143,7 +139,7 @@ pub struct DropItem {
     pub id: Option<String>,
 }
 
-#[derive(Args)]
+#[derive(Parser)]
 pub struct GetItemPath {
     #[clap(help = "Name of the item to get the path of in the trash")]
     pub filename: String,
@@ -162,5 +158,5 @@ pub struct GetItemPath {
     pub allow_invalid_utf8_path: bool,
 }
 
-#[derive(Args)]
+#[derive(Parser)]
 pub struct EmptyTrash {}
