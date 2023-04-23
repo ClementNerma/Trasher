@@ -13,6 +13,8 @@ use args::*;
 use fsutils::cleanup_transfer_dir;
 use std::{fs, path::PathBuf};
 
+use crate::fsutils::TRASH_TRANSFER_DIRNAME;
+
 fn main() {
     let opts = Opts::parse();
 
@@ -29,7 +31,7 @@ fn main() {
             fail!("Trash directory does not exist. Specify '--create-trash-dir' to create it automatically.");
         }
 
-        fs::create_dir_all(&trash_dir).unwrap();
+        fs::create_dir_all(trash_dir.join(TRASH_TRANSFER_DIRNAME)).unwrap();
 
         debug!("Created trash directory.");
     }

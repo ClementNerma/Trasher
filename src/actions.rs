@@ -161,12 +161,6 @@ pub fn remove(action: MoveToTrash, trash_dir: &Path) {
 
         let trash_item_path = transfer_trash_item_path(&trash_item, trash_dir);
 
-        if !trash_dir.exists() {
-            fs::create_dir_all(trash_dir).unwrap_or_else(|err| {
-                fail!("Failed to create trash's transfer directory: {}", err)
-            });
-        }
-
         if let Err(err) = fs::rename(&path, &trash_item_path) {
             debug!("Renaming failed: {:?}", err);
 
