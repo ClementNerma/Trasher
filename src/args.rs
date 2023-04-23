@@ -1,17 +1,14 @@
 use clap::{Parser, Subcommand};
-use once_cell::sync::Lazy;
 use std::path::PathBuf;
-
-pub static OPTS: Lazy<Opts> = Lazy::new(|| Opts::parse());
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
 pub struct Opts {
-    #[clap(short, long)]
-    pub trash_dir: PathBuf,
+    #[clap(short, long, help = "Can be replaced by TRASH_DIR env variable")]
+    pub trash_dir: Option<PathBuf>,
 
     #[clap(short, long)]
-    pub create_trash_dir: bool,
+    pub dont_create_trash_dir: bool,
 
     #[clap(long, help = "Don't clean up the transfer directory automatically")]
     pub no_cleanup: bool,
@@ -82,9 +79,9 @@ pub struct MoveToTrash {
     #[clap(
         short,
         long,
-        help = "For external filesystems, move the items to the main filesystem's trash directory"
+        help = "For external filesystems, don't move the items to the main filesystem's trash directory"
     )]
-    pub move_ext_filesystems: bool,
+    pub dont_move_ext_filesystems: bool,
 
     #[clap(
         short,

@@ -1,50 +1,50 @@
-#![forbid(unused_must_use)]
 #![forbid(unsafe_code)]
+#![forbid(unused_must_use)]
+#![forbid(unused_crate_dependencies)]
 
 mod actions;
-mod command;
+mod args;
 mod fsutils;
 mod items;
 
-use command::*;
+use clap::Parser;
+mod logging;
+use args::*;
 use fsutils::cleanup_transfer_dir;
-use std::fs;
-
-#[macro_export]
-macro_rules! fail {
-    ($message: expr$(,$params: expr)*) => {{
-        eprintln!(concat!("\x1B[91m", "ERROR: ", $message, "\x1B[0m"), $($params,)*);
-        std::process::exit(1);
-    }}
-}
-
-#[macro_export]
-macro_rules! debug {
-    ($message: expr$(,$params: expr)*) => { if OPTS.verbose { println!(concat!("[DEBUG] ", $message), $($params,)*); } }
-}
+use std::{fs, path::PathBuf};
 
 fn main() {
-    if !OPTS.trash_dir.exists() {
-        if !OPTS.create_trash_dir {
+    let opts = Opts::parse();
+
+    let trash_dir = opts.trash_dir.unwrap_or_else(|| {
+        let path = std::env::var_os("TRASH_DIR").unwrap_or_else(|| {
+            fail!("None of --trash-dir option and TRASH_DIR environment variable were provided")
+        });
+
+        PathBuf::from(path)
+    });
+
+    if !trash_dir.exists() {
+        if opts.dont_create_trash_dir {
             fail!("Trash directory does not exist. Specify '--create-trash-dir' to create it automatically.");
         }
 
-        fs::create_dir_all(&OPTS.trash_dir).unwrap();
+        fs::create_dir_all(&trash_dir).unwrap();
 
         debug!("Created trash directory.");
     }
 
-    match &OPTS.action {
-        Action::List(action) => actions::list(action),
-        Action::Remove(action) => actions::remove(action),
-        Action::Drop(action) => actions::drop(action),
-        Action::PathOf(action) => actions::path_of(action),
-        Action::Restore(action) => actions::restore(action),
-        Action::Clear(action) => actions::clear(action),
+    match opts.action {
+        Action::List(action) => actions::list(action, &trash_dir),
+        Action::Remove(action) => actions::remove(action, &trash_dir),
+        Action::Drop(action) => actions::drop(action, &trash_dir),
+        Action::PathOf(action) => actions::path_of(action, &trash_dir),
+        Action::Restore(action) => actions::restore(action, &trash_dir),
+        Action::Clear(action) => actions::clear(action, &trash_dir),
     }
 
-    if !OPTS.no_cleanup {
-        if let Err(err) = cleanup_transfer_dir() {
+    if !opts.no_cleanup {
+        if let Err(err) = cleanup_transfer_dir(&trash_dir) {
             fail!("Failed to cleanup the transfer directory: {}", err)
         }
     }

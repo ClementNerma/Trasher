@@ -1,8 +1,8 @@
 [package]
 name = "trasher"
-version = "1.7.6"
+version = "2.0.0"
 authors = ["Clément Nerma <clement.nerma@gmail.com>"]
-edition = "2018"
+edition = "2021"
 license = "Apache-2.0"
 description = "A small command-line utility to replace 'rm' and 'del' by a trash system"
 readme = "README.md"
