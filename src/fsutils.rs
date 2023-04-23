@@ -1,4 +1,3 @@
-use super::command::OPTS;
 use super::items::TrashItem;
 use fs_extra::dir::TransitProcessResult;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -16,10 +15,6 @@ use std::rc::Rc;
 
 /// Name of the transfer directory in the trash
 pub const TRASH_TRANSFER_DIRNAME: &str = "#PARTIAL";
-
-/// Path to the transfer directory in the trash
-pub static TRASH_TRANSFER_DIR: Lazy<PathBuf> =
-    Lazy::new(|| OPTS.trash_dir.join(TRASH_TRANSFER_DIRNAME));
 
 /// List and parse all items in the trash
 pub fn list_trash_items(trash_path: impl AsRef<Path>) -> IoResult<Vec<TrashItem>> {
@@ -154,28 +149,28 @@ pub fn get_fs_details(path: impl AsRef<Path>) -> IoResult<FSDetails> {
 }
 
 /// Get the trash path for an item that's going to be transferred to it
-pub fn transfer_trash_item_path(item: &TrashItem) -> PathBuf {
-    OPTS.trash_dir
+pub fn transfer_trash_item_path(item: &TrashItem, trash_dir: &Path) -> PathBuf {
+    trash_dir
         .join(TRASH_TRANSFER_DIRNAME)
         .join(item.trash_filename())
 }
 
-pub fn complete_trash_item_path(item: &TrashItem) -> PathBuf {
-    OPTS.trash_dir.join(item.trash_filename())
+pub fn complete_trash_item_path(item: &TrashItem, trash_dir: &Path) -> PathBuf {
+    trash_dir.join(item.trash_filename())
 }
 
 /// Move a partial item to the trash's main directory once the transfer is complete
-pub fn move_transferred_trash_item(item: &TrashItem) -> IoResult<()> {
+pub fn move_transferred_trash_item(item: &TrashItem, trash_dir: &Path) -> IoResult<()> {
     fs::rename(
-        transfer_trash_item_path(item),
-        complete_trash_item_path(item),
+        transfer_trash_item_path(item, trash_dir),
+        complete_trash_item_path(item, trash_dir),
     )
 }
 
 /// Cleanup the transfer directory
-pub fn cleanup_transfer_dir() -> IoResult<()> {
-    if TRASH_TRANSFER_DIR.exists() {
-        fs::remove_dir_all(TRASH_TRANSFER_DIR.as_path())
+pub fn cleanup_transfer_dir(dir: &Path) -> IoResult<()> {
+    if dir.exists() {
+        fs::remove_dir_all(dir)
     } else {
         Ok(())
     }
