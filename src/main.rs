@@ -26,12 +26,14 @@ fn main() {
         PathBuf::from(path)
     });
 
-    if !trash_dir.exists() {
+    let partial_trash_dir = trash_dir.join(TRASH_TRANSFER_DIRNAME);
+
+    if !partial_trash_dir.exists() {
         if opts.dont_create_trash_dir {
             fail!("Trash directory does not exist. Specify '--create-trash-dir' to create it automatically.");
         }
 
-        fs::create_dir_all(trash_dir.join(TRASH_TRANSFER_DIRNAME)).unwrap();
+        fs::create_dir_all(partial_trash_dir).unwrap();
 
         debug!("Created trash directory.");
     }
