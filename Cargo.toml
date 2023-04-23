@@ -21,3 +21,10 @@ once_cell = "1.17.1"
 [[bin]]
 name = "trasher"
 path = "src/main.rs"
+
+[profile.dist]
+inherits = "release"
+lto = "thin"
+
+[workspace.metadata.dist]
+targets = ["x86_64-unknown-linux-gnu"]
