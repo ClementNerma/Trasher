@@ -33,7 +33,7 @@ fn main() {
             fail!("Trash directory does not exist. Specify '--create-trash-dir' to create it automatically.");
         }
 
-        fs::create_dir_all(partial_trash_dir).unwrap();
+        fs::create_dir_all(&partial_trash_dir).unwrap();
 
         debug!("Created trash directory.");
     }
@@ -48,7 +48,7 @@ fn main() {
     }
 
     if !opts.no_cleanup {
-        if let Err(err) = cleanup_transfer_dir(&trash_dir) {
+        if let Err(err) = cleanup_transfer_dir(&partial_trash_dir) {
             fail!("Failed to cleanup the transfer directory: {}", err)
         }
     }
