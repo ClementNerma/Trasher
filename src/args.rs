@@ -4,16 +4,25 @@ use std::path::PathBuf;
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
 pub struct Opts {
-    #[clap(short, long, help = "Can be replaced by TRASH_DIR env variable")]
+    #[clap(
+        global = true,
+        short,
+        long,
+        help = "Can be replaced by TRASH_DIR env variable"
+    )]
     pub trash_dir: Option<PathBuf>,
 
-    #[clap(short, long)]
+    #[clap(global = true, short, long)]
     pub dont_create_trash_dir: bool,
 
-    #[clap(long, help = "Don't clean up the transfer directory automatically")]
+    #[clap(
+        global = true,
+        long,
+        help = "Don't clean up the transfer directory automatically"
+    )]
     pub no_cleanup: bool,
 
-    #[clap(short, long)]
+    #[clap(global = true, short, long)]
     pub verbose: bool,
 
     #[clap(subcommand)]
