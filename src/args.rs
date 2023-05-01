@@ -72,7 +72,7 @@ pub struct ListTrashItems {
 
 #[derive(Parser)]
 pub struct MoveToTrash {
-    #[clap(help = "Path of the items to move to the trash")]
+    #[clap(num_args = 1.., help = "Path of the items to move to the trash")]
     pub paths: Vec<String>,
 
     #[clap(short, long, help = "Delete the items permanently")]
