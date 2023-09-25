@@ -1,14 +1,15 @@
 use super::items::TrashItem;
+use anyhow::bail;
+use anyhow::Context;
+use anyhow::Result;
 use fs_extra::dir::TransitProcessResult;
 use indicatif::{ProgressBar, ProgressStyle};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::cell::RefCell;
-use std::error::Error;
 use std::ffi::OsStr;
 use std::fmt;
 use std::fs;
-use std::io::Result as IoResult;
 use std::path::Component;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -17,8 +18,9 @@ use std::rc::Rc;
 pub const TRASH_TRANSFER_DIRNAME: &str = "#PARTIAL";
 
 /// List and parse all items in the trash
-pub fn list_trash_items(trash_path: impl AsRef<Path>) -> IoResult<Vec<TrashItem>> {
-    Ok(fs::read_dir(trash_path)?
+pub fn list_trash_items(trash_dir: impl AsRef<Path>) -> Result<Vec<TrashItem>> {
+    Ok(fs::read_dir(trash_dir)
+        .context("Failed to read trash directory")?
         .collect::<Result<Vec<_>, _>>()?
         .iter()
         .filter_map(|item| {
@@ -56,32 +58,27 @@ pub fn expect_trash_item(
     trash_dir: impl AsRef<Path>,
     filename: &str,
     id: Option<&str>,
-) -> FoundTrashItems {
-    let mut candidates: Vec<TrashItem> = list_trash_items(&trash_dir)
-        .unwrap()
+) -> Result<FoundTrashItems> {
+    let mut candidates: Vec<TrashItem> = list_trash_items(&trash_dir)?
         .into_iter()
         .filter(|item| item.filename() == filename)
         .collect();
 
     if candidates.is_empty() {
-        super::fail!("Specified item was not found in the trash.");
+        bail!("Specified item was not found in the trash.");
     } else if candidates.len() > 1 {
         match id {
-            None => return FoundTrashItems::Multi(candidates),
-            Some(id) => {
-                return FoundTrashItems::Single(
-                    candidates
-                        .into_iter()
-                        .find(|c| c.id() == id)
-                        .unwrap_or_else(|| {
-                            super::fail!("There is no trash item with the provided ID")
-                        }),
-                )
-            }
+            None => Ok(FoundTrashItems::Multi(candidates)),
+            Some(id) => Ok(FoundTrashItems::Single(
+                candidates
+                    .into_iter()
+                    .find(|c| c.id() == id)
+                    .context("There is no trash item with the provided ID")?,
+            )),
         }
+    } else {
+        Ok(FoundTrashItems::Single(candidates.remove(0)))
     }
-
-    FoundTrashItems::Single(candidates.remove(0))
 }
 
 /// Find a specific item in the trash, fail if none is found or if multiple candidates are found
@@ -89,10 +86,10 @@ pub fn expect_single_trash_item(
     trash_dir: impl AsRef<Path>,
     filename: &str,
     id: Option<&str>,
-) -> TrashItem {
-    match expect_trash_item(trash_dir, filename, id) {
-        FoundTrashItems::Single(item) => item,
-        FoundTrashItems::Multi(candidates) => super::fail!(
+) -> Result<TrashItem> {
+    match expect_trash_item(trash_dir, filename, id)? {
+        FoundTrashItems::Single(item) => Ok(item),
+        FoundTrashItems::Multi(candidates) => bail!(
             "Multiple items with this filename were found in the trash:{}",
             candidates
                 .iter()
@@ -103,7 +100,7 @@ pub fn expect_single_trash_item(
 }
 
 /// Get details on a filesystem item
-pub fn get_fs_details(path: impl AsRef<Path>) -> IoResult<FSDetails> {
+pub fn get_fs_details(path: impl AsRef<Path>) -> Result<FSDetails> {
     let metadata = fs::metadata(&path)?;
 
     let is_dir = metadata.is_dir();
@@ -160,20 +157,22 @@ pub fn complete_trash_item_path(item: &TrashItem, trash_dir: &Path) -> PathBuf {
 }
 
 /// Move a partial item to the trash's main directory once the transfer is complete
-pub fn move_transferred_trash_item(item: &TrashItem, trash_dir: &Path) -> IoResult<()> {
+pub fn move_transferred_trash_item(item: &TrashItem, trash_dir: &Path) -> Result<()> {
     fs::rename(
         transfer_trash_item_path(item, trash_dir),
         complete_trash_item_path(item, trash_dir),
-    )
+    )?;
+
+    Ok(())
 }
 
 /// Cleanup the transfer directory
-pub fn cleanup_transfer_dir(dir: &Path) -> IoResult<()> {
+pub fn cleanup_transfer_dir(dir: &Path) -> Result<()> {
     if dir.exists() {
-        fs::remove_dir_all(dir)
-    } else {
-        Ok(())
+        fs::remove_dir_all(dir)?;
     }
+
+    Ok(())
 }
 
 /// Convert a size in bytes to a human-readable size
@@ -206,8 +205,10 @@ static PARSE_SIZE_STR: Lazy<Regex> = Lazy::new(|| {
 });
 
 /// Convert a human-readable size back to a number of bytes
-pub fn parse_human_readable_size(size: &str) -> Result<u64, &'static str> {
-    let captured = PARSE_SIZE_STR.captures(size).ok_or("Unknown size format")?;
+pub fn parse_human_readable_size(size: &str) -> Result<u64> {
+    let captured = PARSE_SIZE_STR
+        .captures(size)
+        .context("Unknown size format")?;
 
     let int = captured["intqty"].parse::<u64>().unwrap();
     let dec = captured.name("decqty");
@@ -217,10 +218,11 @@ pub fn parse_human_readable_size(size: &str) -> Result<u64, &'static str> {
         .next()
         .unwrap()
         .to_ascii_uppercase();
+
     let unit_size = 1024u64.pow("BKMGTPE".chars().position(|c| c == unit_char).unwrap() as u32);
 
     if dec.is_some() && unit_size == 1 {
-        return Err("Cannot use decimal bytes");
+        bail!("Cannot use decimal bytes");
     }
 
     let dec_size = match dec {
@@ -232,7 +234,7 @@ pub fn parse_human_readable_size(size: &str) -> Result<u64, &'static str> {
             let unit_divider = 10u64.pow(dec.len() as u32);
 
             if unit_divider.to_string().len() > unit_size.to_string().len() {
-                return Err("Too many decimals for this unit, would give decimal bytes");
+                bail!("Too many decimals for this unit, would give decimal bytes");
             }
 
             unit_size * dec_num / unit_divider
@@ -243,7 +245,7 @@ pub fn parse_human_readable_size(size: &str) -> Result<u64, &'static str> {
 }
 
 /// Move items around with a progressbar
-pub fn move_item_pbr(path: &Path, target: &Path) -> Result<(), Box<dyn Error>> {
+pub fn move_item_pbr(path: &Path, target: &Path) -> Result<()> {
     let pbr = Rc::new(RefCell::new(None));
 
     let update_pbr = |copied, total, item_name: &str| {
