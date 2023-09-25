@@ -1,6 +1,8 @@
 use anyhow::Context;
 use anyhow::Result;
 
+use crate::fuzzy::FuzzyFinderItem;
+
 use super::args::*;
 use super::fsutils::*;
 use super::items::*;
@@ -327,6 +329,36 @@ pub fn restore(action: RestoreItem, trash_dir: &Path) -> Result<()> {
                 .collect::<String>()
         ),
     }
+
+    Ok(())
+}
+
+pub fn restore_with_ui(args: RestoreItemWithUI, trash_dir: &Path) -> Result<()> {
+    let RestoreItemWithUI {} = args;
+
+    let mut items = list_trash_items(trash_dir)?;
+    items.sort_by(|a, b| a.datetime().cmp(b.datetime()));
+
+    let to_remove = crate::fuzzy::run_fuzzy_finder(
+        items
+            .into_iter()
+            .map(|item| FuzzyFinderItem {
+                display: format!("[{}] {}", item.datetime(), item.filename()),
+                value: item,
+            })
+            .collect(),
+    )?;
+
+    restore(
+        RestoreItem {
+            filename: to_remove.filename().to_owned(),
+            to: None,
+            id: Some(to_remove.id().to_owned()),
+            move_ext_filesystems: true,
+            force: false,
+        },
+        trash_dir,
+    )?;
 
     Ok(())
 }

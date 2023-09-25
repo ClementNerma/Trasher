@@ -17,6 +17,7 @@ static DECODER: Lazy<Regex> = Lazy::new(|| {
 
 static DATETIME_FORMAT: &str = "%Y.%m.%d_%Hh%Mm%Ss.%f%z";
 
+#[derive(Debug, Clone)]
 pub struct TrashItem {
     id: String,
     filename: String,
