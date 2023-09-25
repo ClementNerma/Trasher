@@ -44,6 +44,13 @@ pub enum Action {
     )]
     Restore(RestoreItem),
 
+    #[clap(
+        name = "unrm-ui",
+        alias = "restore-with-ui",
+        about = "Restore an item from the trash interactively"
+    )]
+    RestoreWithUI(RestoreItemWithUI),
+
     #[clap(name = "drop", about = "Permanently delete an item from the trash")]
     Drop(DropItem),
 
@@ -131,6 +138,9 @@ pub struct RestoreItem {
     #[clap(short, long, help = "Overwrite target path if it already exists")]
     pub force: bool,
 }
+
+#[derive(Parser)]
+pub struct RestoreItemWithUI {}
 
 #[derive(Parser)]
 pub struct DropItem {

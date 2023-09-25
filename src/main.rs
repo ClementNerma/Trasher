@@ -5,6 +5,7 @@
 mod actions;
 mod args;
 mod fsutils;
+mod fuzzy;
 mod items;
 
 use anyhow::{bail, Context, Result};
@@ -72,6 +73,7 @@ fn inner_main() -> Result<()> {
         Action::Drop(args) => actions::drop(args, &trash_dir)?,
         Action::PathOf(args) => actions::path_of(args, &trash_dir)?,
         Action::Restore(args) => actions::restore(args, &trash_dir)?,
+        Action::RestoreWithUI(args) => actions::restore_with_ui(args, &trash_dir)?,
         Action::Clear(args) => actions::clear(args, &trash_dir)?,
     }
 
