@@ -1,21 +1,21 @@
-use crate::logging::PRINT_DEBUG_MESSAGES;
+use anyhow::Context;
+use anyhow::Result;
 
 use super::args::*;
 use super::fsutils::*;
 use super::items::*;
-use super::{debug, fail};
+use super::{bail, debug};
 
 use std::fs;
 use std::io::ErrorKind;
 use std::path::Path;
 use std::path::PathBuf;
-use std::sync::atomic::Ordering::SeqCst;
 
-pub fn list(action: ListTrashItems, trash_dir: &Path) {
+pub fn list(action: ListTrashItems, trash_dir: &Path) -> Result<()> {
     let ListTrashItems { name, details } = action;
 
     debug!("Listing trash items...");
-    let mut items = list_trash_items(trash_dir).unwrap();
+    let mut items = list_trash_items(trash_dir)?;
 
     if let Some(name) = &name {
         debug!("Filtering {} items by name...", items.len());
@@ -48,9 +48,9 @@ pub fn list(action: ListTrashItems, trash_dir: &Path) {
                 println!(
                     "* {}{}",
                     item,
-                    if details || PRINT_DEBUG_MESSAGES.load(SeqCst) {
-                        let details =
-                            get_fs_details(complete_trash_item_path(&item, trash_dir)).unwrap();
+                    if details {
+                        let details = get_fs_details(complete_trash_item_path(&item, trash_dir))?;
+
                         let dir_one = if details.is_dir { 1 } else { 0 };
 
                         total_size += details.size;
@@ -64,7 +64,7 @@ pub fn list(action: ListTrashItems, trash_dir: &Path) {
                 );
             }
 
-            if details || PRINT_DEBUG_MESSAGES.load(SeqCst) {
+            if details {
                 println!(
                     "{} directories, {} files, total size is: {}",
                     total_dirs,
@@ -74,9 +74,11 @@ pub fn list(action: ListTrashItems, trash_dir: &Path) {
             }
         }
     }
+
+    Ok(())
 }
 
-pub fn remove(action: MoveToTrash, trash_dir: &Path) {
+pub fn remove(action: MoveToTrash, trash_dir: &Path) -> Result<()> {
     let MoveToTrash {
         paths,
         permanently,
@@ -86,15 +88,13 @@ pub fn remove(action: MoveToTrash, trash_dir: &Path) {
         allow_invalid_utf8_item_names,
     } = action;
 
-    let size_limit_move_ext_filesystems =
-        size_limit_move_ext_filesystems.as_ref().map(|size_limit| {
-            parse_human_readable_size(size_limit).unwrap_or_else(|err| {
-                fail!(
-                    "Invalid size limit provided for externals filesystems' items moving: {}",
-                    err
-                )
-            })
-        });
+    let size_limit_move_ext_filesystems = size_limit_move_ext_filesystems
+        .as_ref()
+        .map(|size_limit| {
+            parse_human_readable_size(size_limit)
+                .context("Invalid size limit provided for externals filesystems' items moving")
+        })
+        .transpose()?;
 
     debug!("Going to remove {} item(s)...", paths.len());
 
@@ -106,7 +106,7 @@ pub fn remove(action: MoveToTrash, trash_dir: &Path) {
         debug!("Checking if item exists...");
 
         if is_dangerous_path(&path) {
-            fail!("Removing this path is too dangerous, operation aborted.");
+            bail!("Removing this path is too dangerous, operation aborted.");
         }
 
         if !path.exists() {
@@ -114,7 +114,7 @@ pub fn remove(action: MoveToTrash, trash_dir: &Path) {
                 continue;
             }
 
-            fail!("Item path does not exist.");
+            bail!("Item path does not exist.");
         }
 
         if permanently {
@@ -125,32 +125,32 @@ pub fn remove(action: MoveToTrash, trash_dir: &Path) {
             };
 
             match deletion_result {
-                Err(err) => fail!("Failed to permanently remove item: {}", err),
+                Err(err) => bail!("Failed to permanently remove item: {}", err),
                 Ok(()) => continue,
             }
         }
 
         let filename = path
             .file_name()
-            .unwrap_or_else(|| fail!("Specified item path has no file name"));
+            .context("Specified item path has no file name")?;
+
         let filename = match filename.to_str() {
             Some(str) => str.to_string(),
             None => {
                 if allow_invalid_utf8_item_names {
                     filename.to_string_lossy().to_string()
                 } else {
-                    fail!("Specified item does not have a valid UTF-8 file name")
+                    bail!("Specified item does not have a valid UTF-8 file name")
                 }
             }
         };
 
-        let item_metadata = path.metadata().unwrap_or_else(|err| {
-            fail!(
-                "Failed to get metadata for item at path '{}': {}",
+        let item_metadata = path.metadata().with_context(|| {
+            format!(
+                "Failed to get metadata for item at path '{}'",
                 path.to_string_lossy(),
-                err
             )
-        });
+        })?;
 
         let trash_item = TrashItem::new_now(filename.to_string(), Some(item_metadata.file_type()));
 
@@ -167,10 +167,10 @@ pub fn remove(action: MoveToTrash, trash_dir: &Path) {
             // HACK: *MUST* be removed when this issue is resolved: https://github.com/rust-lang/rust/issues/86442
             if err.kind().to_string() == "cross-device link or rename" {
                 if dont_move_ext_filesystems {
-                    fail!("Failed to move item to trash: {}\nHelp: Item may be located on another drive, try removing '--move-ext-filesystems'.", err);
+                    bail!("Failed to move item to trash: {}\nHelp: Item may be located on another drive, try removing '--move-ext-filesystems'.", err);
                 }
             } else if err.kind() != ErrorKind::Other {
-                fail!(
+                bail!(
                     "An error occured while trying to move item to trash: {}",
                     err
                 );
@@ -185,15 +185,11 @@ pub fn remove(action: MoveToTrash, trash_dir: &Path) {
                 );
                 debug!("Computing size of the item to remove...");
 
-                let details = get_fs_details(&path).unwrap_or_else(|err| {
-                    fail!(
-                        "Failed to compute size of item before sending it to the trash: {}",
-                        err
-                    )
-                });
+                let details = get_fs_details(&path)
+                    .context("Failed to compute size of item before sending it to the trash: {}")?;
 
                 if details.size > size_limit {
-                    fail!(
+                    bail!(
                         "This item ({}) is larger than the provided size limit ({}).",
                         human_readable_size(details.size),
                         human_readable_size(size_limit)
@@ -201,12 +197,8 @@ pub fn remove(action: MoveToTrash, trash_dir: &Path) {
                 }
             }
 
-            move_item_pbr(&path, &trash_item_path).unwrap_or_else(|err| {
-                fail!(
-                    "Failed to move item to trash (using copying fallback): {}",
-                    err
-                )
-            })
+            move_item_pbr(&path, &trash_item_path)
+                .context("Failed to move item to trash (using copying fallback)")?;
         }
 
         let mut rename_errors = 0;
@@ -220,7 +212,7 @@ pub fn remove(action: MoveToTrash, trash_dir: &Path) {
             );
 
             if rename_errors == 5 {
-                fail!(
+                bail!(
                     "Failed to rename transferred item in trash after {} tries: {}",
                     rename_errors,
                     err
@@ -228,28 +220,25 @@ pub fn remove(action: MoveToTrash, trash_dir: &Path) {
             }
         }
     }
+
+    Ok(())
 }
 
-pub fn drop(action: DropItem, trash_dir: &Path) {
+pub fn drop(action: DropItem, trash_dir: &Path) -> Result<()> {
     let DropItem { filename, id } = action;
 
     debug!("Listing trash items...");
 
-    let item = expect_single_trash_item(trash_dir, &filename, id.as_deref());
+    let item = expect_single_trash_item(trash_dir, &filename, id.as_deref())?;
     let item_path = complete_trash_item_path(&item, trash_dir);
 
     debug!("Permanently removing item from trash...");
 
-    if let Err(err) = fs::remove_dir_all(item_path) {
-        fail!(
-            "Failed to remove item '{}' from trash: {}",
-            item.filename(),
-            err
-        );
-    }
+    fs::remove_dir_all(item_path)
+        .with_context(|| format!("Failed to remove item '{}' from trash", item.filename()))
 }
 
-pub fn path_of(action: GetItemPath, trash_dir: &Path) {
+pub fn path_of(action: GetItemPath, trash_dir: &Path) -> Result<()> {
     let GetItemPath {
         filename,
         id,
@@ -258,7 +247,7 @@ pub fn path_of(action: GetItemPath, trash_dir: &Path) {
 
     debug!("Listing trash items...");
 
-    let item = expect_single_trash_item(trash_dir, &filename, id.as_deref());
+    let item = expect_single_trash_item(trash_dir, &filename, id.as_deref())?;
     let item_path = complete_trash_item_path(&item, trash_dir);
 
     match item_path.to_str() {
@@ -267,16 +256,18 @@ pub fn path_of(action: GetItemPath, trash_dir: &Path) {
             if allow_invalid_utf8_path {
                 println!("{}", item_path.to_string_lossy())
             } else {
-                fail!(
+                bail!(
                     "Path contains invalid UTF-8 characters (lossy: {})",
                     item_path.to_string_lossy()
                 );
             }
         }
     }
+
+    Ok(())
 }
 
-pub fn restore(action: RestoreItem, trash_dir: &Path) {
+pub fn restore(action: RestoreItem, trash_dir: &Path) -> Result<()> {
     let RestoreItem {
         filename,
         to,
@@ -287,33 +278,33 @@ pub fn restore(action: RestoreItem, trash_dir: &Path) {
 
     debug!("Listing trash items...");
 
-    match expect_trash_item(trash_dir, &filename, id.as_deref()) {
+    match expect_trash_item(trash_dir, &filename, id.as_deref())? {
         FoundTrashItems::Single(item) => {
             let item_path = complete_trash_item_path(&item, trash_dir);
-            let target_path = to
-                .unwrap_or_else(|| std::env::current_dir().unwrap())
-                .join(item.filename());
+
+            let target_path = match to {
+                Some(to) => to,
+                None => std::env::current_dir()?,
+            };
+
+            let target_path = target_path.join(item.filename());
 
             if target_path.exists() {
                 if !force {
-                    fail!("Target path already exists, use '-f' / '--force' to override the existing item.");
+                    bail!("Target path already exists, use '-f' / '--force' to override the existing item.");
                 }
 
                 debug!("Restoration path already exists, permanently removing it...");
 
-                if let Err(err) = fs::remove_dir_all(&target_path) {
-                    fail!(
-                        "Failed to remove existing item at restoration path: {}",
-                        err
-                    );
-                }
+                fs::remove_dir_all(&target_path)
+                    .context("Failed to remove existing item at restoration path")?;
             }
 
             debug!("Restoring item from trash...");
 
             if let Err(err) = fs::rename(&item_path, &target_path) {
                 if !move_ext_filesystems {
-                    fail!(
+                    bail!(
                         "Failed to restore item '{}' from trash: {}",
                         item.filename(),
                         err
@@ -323,12 +314,8 @@ pub fn restore(action: RestoreItem, trash_dir: &Path) {
                 debug!("Renaming failed: {}", err);
                 debug!("Falling back to copying.");
 
-                move_item_pbr(&item_path, &target_path).unwrap_or_else(|err| {
-                    fail!(
-                        "Failed to restore item from trash (using copying fallback): {}",
-                        err
-                    )
-                })
+                move_item_pbr(&item_path, &target_path)
+                    .context("Failed to restore item from trash (using copying fallback)")?;
             }
         }
 
@@ -340,19 +327,21 @@ pub fn restore(action: RestoreItem, trash_dir: &Path) {
                 .collect::<String>()
         ),
     }
+
+    Ok(())
 }
 
-pub fn clear(action: EmptyTrash, trash_dir: &Path) {
+pub fn clear(action: EmptyTrash, trash_dir: &Path) -> Result<()> {
     let EmptyTrash {} = action;
 
     debug!("Emptying the trash...");
 
     // TODO: Ask confirmation
 
-    if let Err(err) = fs::remove_dir_all(trash_dir) {
-        fail!("Failed to empty trash: {}", err);
-    }
+    fs::remove_dir_all(trash_dir).context("Failed to empty the trash")?;
+    fs::create_dir_all(trash_dir).context("Failed to re-create trash directory")?;
 
-    fs::create_dir_all(trash_dir).unwrap();
     println!("Trash has been emptied.");
+
+    Ok(())
 }
