@@ -9,34 +9,6 @@ It works by moving items to delete to a _trash directory_ instead of deleting th
 
 An optional fuzzy finder is included to restore items interactively.
 
-## How does it work
-
-When an item is moved to the trash, its name is suffixed by its date of deletion and by an ID which is computed using a double CRC (see [technical details](#technical-details)).
-
-For instance, when deleting an item named `my-files`, it will be moved to the trash directory under a name like:
-
-```
-my-files [@ 2020.08.03_11h36m36s.093347700+0200] {IBuc}
-```
-
-This allows you to open the trash directory and see its content without using the Trasher binary. Also, Trasher doesn't use an index file, it only extracts informations from the files present in the trash, so you can move it to another drive without any problem, or even merge two trash directories into a single one!
-
-This renaming also allows to delete multiple items with the same name without any conflict.
-
-You can then then restore items from the trash by specifying their names. If multiple items have the same name, a list of items with the provided name will be displayed along with their ID, and you will be asked to specify the ID of the item you want to restore.
-
-### External filesystems
-
-The moving is actually performed by renaming the file, which is a lot faster than moving data around and gives exactly the same result. But, for external filesystems, sending an item to the trash means it must be moved, which can be quite slow.
-
-On Windows, deleting an item from a NTFS device will send it to a device-specific recycle bin located in this drive and handled by Windows itself.
-
-As Trasher only takes the trash directory it has been provided, you can use a device-specific trash by simply providing a trash directory path that is on the device you're removing items from.
-
-But if you only want to use a single trash directory on, let's say, your computer's internal hard drive / SSD, removing items from an external storage device will fail by default. You can still allow it by providing the `-m / --move-ext-filesystems` option, which will make Trasher move the deleted items to the main filesystem's trash, which can take a lot of time if there are many (especially large) files and/or directories to move around.
-
-It's also possible to specify a size limit for external filesystems' items. This way, items won't be moved around if they are too large, making the command fail instead. Such size can be provided with `-s / --size-limit-move-ext-filesystems` using an integer or floating-point size suffixed by either `B` for bytes, `K` for kilobytes, `M` for megabytes, `G` for gigabytes, `T` for terabytes, `P` for petabytes and finally `E` for exabytes. It's also possible to add another `B` or `iB` which makes the following sizes all valid: `2.4M`, `2.4MB`, `2.4MiB`.
-
 ## Usage
 
 All commands look like this:
@@ -71,6 +43,34 @@ There are several actions available:
 * `unrm-ui`: restore an item interactively (a fuzzy finder will be displayed)
 * `drop <name>`: permanently delete an item from the trash, use `--id` to provide an ID
 * `clear`: remove all items from the trash
+
+## How does it work
+
+When an item is moved to the trash, its name is suffixed by its date of deletion and by an ID which is computed using a double CRC (see [technical details](#technical-details)).
+
+For instance, when deleting an item named `my-files`, it will be moved to the trash directory under a name like:
+
+```
+my-files [@ 2020.08.03_11h36m36s.093347700+0200] {IBuc}
+```
+
+This allows you to open the trash directory and see its content without using the Trasher binary. Also, Trasher doesn't use an index file, it only extracts informations from the files present in the trash, so you can move it to another drive without any problem, or even merge two trash directories into a single one!
+
+This renaming also allows to delete multiple items with the same name without any conflict.
+
+You can then then restore items from the trash by specifying their names. If multiple items have the same name, a list of items with the provided name will be displayed along with their ID, and you will be asked to specify the ID of the item you want to restore.
+
+### External filesystems
+
+The moving is actually performed by renaming the file, which is a lot faster than moving data around and gives exactly the same result. But, for external filesystems, sending an item to the trash means it must be moved, which can be quite slow.
+
+On Windows, deleting an item from a NTFS device will send it to a device-specific recycle bin located in this drive and handled by Windows itself.
+
+As Trasher only takes the trash directory it has been provided, you can use a device-specific trash by simply providing a trash directory path that is on the device you're removing items from.
+
+But if you only want to use a single trash directory on, let's say, your computer's internal hard drive / SSD, removing items from an external storage device will fail by default. You can still allow it by providing the `-m / --move-ext-filesystems` option, which will make Trasher move the deleted items to the main filesystem's trash, which can take a lot of time if there are many (especially large) files and/or directories to move around.
+
+It's also possible to specify a size limit for external filesystems' items. This way, items won't be moved around if they are too large, making the command fail instead. Such size can be provided with `-s / --size-limit-move-ext-filesystems` using an integer or floating-point size suffixed by either `B` for bytes, `K` for kilobytes, `M` for megabytes, `G` for gigabytes, `T` for terabytes, `P` for petabytes and finally `E` for exabytes. It's also possible to add another `B` or `iB` which makes the following sizes all valid: `2.4M`, `2.4MB`, `2.4MiB`.
 
 ## Technical details
 
