@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 #![forbid(unused_must_use)]
 #![warn(unused_crate_dependencies)]
+#![allow(clippy::format_collect)]
 
 mod actions;
 mod args;
@@ -8,18 +9,13 @@ mod fsutils;
 mod fuzzy;
 mod items;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use args::*;
 use clap::Parser;
-use fsutils::cleanup_transfer_dir;
 use std::{
-    env, fs,
-    path::PathBuf,
     process::ExitCode,
     sync::atomic::{AtomicBool, Ordering},
 };
-
-use crate::fsutils::TRASH_TRANSFER_DIRNAME;
 
 fn main() -> ExitCode {
     match inner_main() {
@@ -32,54 +28,19 @@ fn main() -> ExitCode {
 }
 
 fn inner_main() -> Result<()> {
-    let Opts {
-        trash_dir,
-        dont_create_trash_dir,
-        no_cleanup,
-        verbose,
-        action,
-    } = Opts::parse();
+    let Opts { verbose, action } = Opts::parse();
 
     if verbose {
         PRINT_DEBUG_MESSAGES.store(true, Ordering::SeqCst);
     }
 
-    let trash_dir = match trash_dir {
-        Some(trash_dir) => trash_dir,
-        None => {
-            let path = env::var_os("TRASH_DIR").context(
-                "None of --trash-dir option and TRASH_DIR environment variable were provided",
-            )?;
-
-            PathBuf::from(path)
-        }
-    };
-
-    let partial_trash_dir = trash_dir.join(TRASH_TRANSFER_DIRNAME);
-
-    if !partial_trash_dir.exists() {
-        if dont_create_trash_dir {
-            bail!("Trash directory does not exist. Specify '--create-trash-dir' to create it automatically.");
-        }
-
-        fs::create_dir_all(&partial_trash_dir).unwrap();
-
-        debug!("Created trash directory.");
-    }
-
     match action {
-        Action::List(args) => actions::list(args, &trash_dir)?,
-        Action::Remove(args) => actions::remove(args, &trash_dir)?,
-        Action::Drop(args) => actions::drop(args, &trash_dir)?,
-        Action::PathOf(args) => actions::path_of(args, &trash_dir)?,
-        Action::Restore(args) => actions::restore(args, &trash_dir)?,
-        Action::RestoreWithUI(args) => actions::restore_with_ui(args, &trash_dir)?,
-        Action::Clear(args) => actions::clear(args, &trash_dir)?,
-    }
-
-    if !no_cleanup {
-        cleanup_transfer_dir(&partial_trash_dir)
-            .context("Failed to clean the transfer directory")?;
+        Action::List(args) => actions::list(args)?,
+        Action::Remove(args) => actions::remove(args)?,
+        Action::Drop(args) => actions::drop(args)?,
+        Action::PathOf(args) => actions::path_of(args)?,
+        Action::Restore(args) => actions::restore(args)?,
+        Action::Empty(args) => actions::empty(args)?,
     }
 
     Ok(())

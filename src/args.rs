@@ -4,24 +4,6 @@ use std::path::PathBuf;
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
 pub struct Opts {
-    #[clap(
-        global = true,
-        short,
-        long,
-        help = "Can be replaced by TRASH_DIR env variable"
-    )]
-    pub trash_dir: Option<PathBuf>,
-
-    #[clap(global = true, short, long)]
-    pub dont_create_trash_dir: bool,
-
-    #[clap(
-        global = true,
-        long,
-        help = "Don't clean up the transfer directory automatically"
-    )]
-    pub no_cleanup: bool,
-
     #[clap(global = true, short, long)]
     pub verbose: bool,
 
@@ -44,13 +26,6 @@ pub enum Action {
     )]
     Restore(RestoreItem),
 
-    #[clap(
-        name = "unrm-ui",
-        alias = "restore-with-ui",
-        about = "Restore an item from the trash interactively"
-    )]
-    RestoreWithUI(RestoreItemWithUI),
-
     #[clap(name = "drop", about = "Permanently delete an item from the trash")]
     Drop(DropItem),
 
@@ -60,8 +35,8 @@ pub enum Action {
     )]
     PathOf(GetItemPath),
 
-    #[clap(name = "clear", about = "Permanently delete all items in the trash")]
-    Clear(EmptyTrash),
+    #[clap(name = "empty", about = "Permanently delete all items in the trash")]
+    Empty(EmptyTrash),
 }
 
 #[derive(Parser)]
@@ -95,20 +70,6 @@ pub struct MoveToTrash {
     #[clap(
         short,
         long,
-        help = "For external filesystems, don't move the items to the main filesystem's trash directory"
-    )]
-    pub dont_move_ext_filesystems: bool,
-
-    #[clap(
-        short,
-        long,
-        help = "Only apply '--move-ext-filesystems' if the items' size is lower or equal to the provided one"
-    )]
-    pub size_limit_move_ext_filesystems: Option<String>,
-
-    #[clap(
-        short,
-        long,
         help = "Do not fail when encoutering invalid UTF-8 file names"
     )]
     pub allow_invalid_utf8_item_names: bool,
@@ -117,30 +78,22 @@ pub struct MoveToTrash {
 #[derive(Parser)]
 pub struct RestoreItem {
     #[clap(help = "Name of the item to restore")]
-    pub filename: String,
+    pub filename: Option<String>,
 
-    #[clap(long, help = "Destination path (defaults to the current directory)")]
+    #[clap(
+        long,
+        help = "Destination path (defaults to the current directory)",
+        requires = "filename"
+    )]
     pub to: Option<PathBuf>,
 
     #[clap(
         long,
-        help = "ID of the item to restore in case multiple exist with the same name"
+        help = "ID of the item to restore in case multiple exist with the same name",
+        requires = "filename"
     )]
     pub id: Option<String>,
-
-    #[clap(
-        short,
-        long,
-        help = "For external filesystems, move the item from the main filesystem's trash directory"
-    )]
-    pub move_ext_filesystems: bool,
-
-    #[clap(short, long, help = "Overwrite target path if it already exists")]
-    pub force: bool,
 }
-
-#[derive(Parser)]
-pub struct RestoreItemWithUI {}
 
 #[derive(Parser)]
 pub struct DropItem {
