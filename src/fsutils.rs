@@ -1,12 +1,15 @@
+use crate::debug;
+
 use super::items::TrashItem;
 use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
 use fs_extra::dir::TransitProcessResult;
-use indicatif::{ProgressBar, ProgressStyle};
-use once_cell::sync::Lazy;
-use regex::Regex;
+use indicatif::ProgressBar;
+use indicatif::ProgressStyle;
+use mountpoints::mountpaths;
 use std::cell::RefCell;
+use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::fmt;
 use std::fs;
@@ -14,15 +17,80 @@ use std::path::Component;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
+/// Name of the trash directory
+const TRASH_DIR_NAME: &str = ".trasher";
+
 /// Name of the transfer directory in the trash
 pub const TRASH_TRANSFER_DIRNAME: &str = "#PARTIAL";
 
-/// List and parse all items in the trash
-pub fn list_trash_items(trash_dir: impl AsRef<Path>) -> Result<Vec<TrashItem>> {
-    Ok(fs::read_dir(trash_dir)
-        .context("Failed to read trash directory")?
-        .collect::<Result<Vec<_>, _>>()?
+/// Determine path to the trash directory for a given item and create it if required
+pub fn determine_trash_dir_for(item: &Path) -> Result<PathBuf> {
+    debug!("Determining trasher directory for item: {}", item.display());
+
+    let parent_dir = match determine_mountpoint_for(item)? {
+        Some(path) => path,
+        None => dirs::home_dir().context("Failed to determine path to user's home directory")?,
+    };
+
+    let trash_dir_path = parent_dir.join(TRASH_DIR_NAME);
+
+    if !trash_dir_path.exists() {
+        fs::create_dir_all(trash_dir_path.join(TRASH_TRANSFER_DIRNAME)).with_context(|| {
+            format!(
+                "Failed to create trash directory (with transfer directory) at: {}",
+                trash_dir_path.display()
+            )
+        })?;
+    }
+
+    Ok(trash_dir_path)
+}
+
+/// Determine the (canonicalized) path to the mountpoint the provided path is on
+pub fn determine_mountpoint_for(item: &Path) -> Result<Option<PathBuf>> {
+    let item = fs::canonicalize(item)
+        .with_context(|| format!("Failed to canonicalize item path: {}", item.display()))?;
+
+    let mountpoints = mountpaths().context("Failed to list system mountpoints")?;
+
+    for mountpoint in &mountpoints {
+        let canon_mountpoint = fs::canonicalize(mountpoint).with_context(|| {
+            format!(
+                "Failed to canonicalize mountpoint: {}",
+                mountpoint.display()
+            )
+        })?;
+
+        if item.starts_with(&canon_mountpoint) {
+            return Ok(Some(canon_mountpoint));
+        }
+    }
+
+    Ok(None)
+}
+
+/// List all trash directories
+pub fn list_trash_dirs() -> Result<BTreeSet<PathBuf>> {
+    let canon_root = fs::canonicalize("/").context("Failed to canonicalize the root directory")?;
+
+    let trash_dirs = mountpaths()
+        .context("Failed to list system mountpoints")?
         .iter()
+        .chain([canon_root].iter())
+        .map(|path| determine_trash_dir_for(path))
+        .collect::<Result<BTreeSet<_>, _>>()?;
+
+    Ok(trash_dirs)
+}
+
+/// List and parse all items in the trash
+pub fn list_trash_items(trash_dir: &Path) -> Result<Vec<TrashedItem>> {
+    let dir_entries = fs::read_dir(trash_dir)
+        .context("Failed to read trash directory")?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let items = dir_entries
+        .into_iter()
         .filter_map(|item| {
             match item.file_name().into_string() {
                 Err(invalid_filename) => eprintln!(
@@ -43,26 +111,39 @@ pub fn list_trash_items(trash_dir: impl AsRef<Path>) -> Result<Vec<TrashItem>> {
                             );
                             super::debug!("Invalid trash item filename: {:?}", err);
                         }
-                        Ok(trash_item) => return Some(trash_item),
+
+                        Ok(item) => {
+                            return Some(TrashedItem {
+                                data: item,
+                                trash_dir: trash_dir.to_path_buf(),
+                            })
+                        }
                     }
                 }
             }
 
             None
         })
-        .collect())
+        .collect();
+
+    Ok(items)
+}
+
+/// List all trash items
+pub fn list_all_trash_items() -> Result<impl Iterator<Item = TrashedItem>> {
+    let all_trash_items = list_trash_dirs()?
+        .into_iter()
+        .map(|trash_dir| list_trash_items(&trash_dir))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(all_trash_items.into_iter().flatten())
 }
 
 /// Find a specific item in the trash (panic if not found)
-pub fn expect_trash_item(
-    trash_dir: impl AsRef<Path>,
-    filename: &str,
-    id: Option<&str>,
-) -> Result<FoundTrashItems> {
-    let mut candidates: Vec<TrashItem> = list_trash_items(&trash_dir)?
-        .into_iter()
-        .filter(|item| item.filename() == filename)
-        .collect();
+pub fn expect_trash_item(filename: &str, id: Option<&str>) -> Result<FoundTrashItems> {
+    let mut candidates = list_all_trash_items()?
+        .filter(|trashed| trashed.data.filename() == filename)
+        .collect::<Vec<_>>();
 
     if candidates.is_empty() {
         bail!("Specified item was not found in the trash.");
@@ -72,7 +153,7 @@ pub fn expect_trash_item(
             Some(id) => Ok(FoundTrashItems::Single(
                 candidates
                     .into_iter()
-                    .find(|c| c.id() == id)
+                    .find(|c| c.data.id() == id)
                     .context("There is no trash item with the provided ID")?,
             )),
         }
@@ -82,18 +163,17 @@ pub fn expect_trash_item(
 }
 
 /// Find a specific item in the trash, fail if none is found or if multiple candidates are found
-pub fn expect_single_trash_item(
-    trash_dir: impl AsRef<Path>,
-    filename: &str,
-    id: Option<&str>,
-) -> Result<TrashItem> {
-    match expect_trash_item(trash_dir, filename, id)? {
+pub fn expect_single_trash_item(filename: &str, id: Option<&str>) -> Result<TrashedItem> {
+    match expect_trash_item(filename, id)? {
         FoundTrashItems::Single(item) => Ok(item),
         FoundTrashItems::Multi(candidates) => bail!(
             "Multiple items with this filename were found in the trash:{}",
             candidates
                 .iter()
-                .map(|c| format!("\n* {}", c))
+                .map(|TrashedItem { data, trash_dir }| format!(
+                    "\n* {data} (from {})",
+                    trash_dir.display()
+                ))
                 .collect::<String>()
         ),
     }
@@ -145,32 +225,12 @@ pub fn get_fs_details(path: impl AsRef<Path>) -> Result<FSDetails> {
     Ok(details)
 }
 
-/// Get the trash path for an item that's going to be transferred to it
-pub fn transfer_trash_item_path(item: &TrashItem, trash_dir: &Path) -> PathBuf {
-    trash_dir
-        .join(TRASH_TRANSFER_DIRNAME)
-        .join(item.trash_filename())
-}
-
-pub fn complete_trash_item_path(item: &TrashItem, trash_dir: &Path) -> PathBuf {
-    trash_dir.join(item.trash_filename())
-}
-
 /// Move a partial item to the trash's main directory once the transfer is complete
-pub fn move_transferred_trash_item(item: &TrashItem, trash_dir: &Path) -> Result<()> {
+pub fn move_transferred_trash_item(item: &TrashedItem) -> Result<()> {
     fs::rename(
-        transfer_trash_item_path(item, trash_dir),
-        complete_trash_item_path(item, trash_dir),
+        item.transfer_trash_item_path(),
+        item.complete_trash_item_path(),
     )?;
-
-    Ok(())
-}
-
-/// Cleanup the transfer directory
-pub fn cleanup_transfer_dir(dir: &Path) -> Result<()> {
-    if dir.exists() {
-        fs::remove_dir_all(dir)?;
-    }
 
     Ok(())
 }
@@ -200,103 +260,30 @@ pub fn human_readable_size(bytes: u64) -> String {
     )
 }
 
-static PARSE_SIZE_STR: Lazy<Regex> = Lazy::new(|| {
-    Regex::new("^(?i)(?P<intqty>\\d+)(?:\\.(?P<decqty>\\d+))?(?P<unit>[BKMGTPE])(?:i?B)?$").unwrap()
-});
-
-/// Convert a human-readable size back to a number of bytes
-pub fn parse_human_readable_size(size: &str) -> Result<u64> {
-    let captured = PARSE_SIZE_STR
-        .captures(size)
-        .context("Unknown size format")?;
-
-    let int = captured["intqty"].parse::<u64>().unwrap();
-    let dec = captured.name("decqty");
-
-    let unit_char = captured["unit"]
-        .chars()
-        .next()
-        .unwrap()
-        .to_ascii_uppercase();
-
-    let unit_size = 1024u64.pow("BKMGTPE".chars().position(|c| c == unit_char).unwrap() as u32);
-
-    if dec.is_some() && unit_size == 1 {
-        bail!("Cannot use decimal bytes");
-    }
-
-    let dec_size = match dec {
-        None => 0,
-        Some(dec) => {
-            let dec = dec.as_str();
-
-            let dec_num = dec.parse::<u64>().unwrap();
-            let unit_divider = 10u64.pow(dec.len() as u32);
-
-            if unit_divider.to_string().len() > unit_size.to_string().len() {
-                bail!("Too many decimals for this unit, would give decimal bytes");
-            }
-
-            unit_size * dec_num / unit_divider
-        }
-    };
-
-    Ok(int * unit_size + dec_size)
+/// Trash item with the trash directory is contained into, generated by the [`list_trash_items`] function
+#[derive(Debug, Clone)]
+pub struct TrashedItem {
+    pub data: TrashItem,
+    pub trash_dir: PathBuf,
 }
 
-/// Move items around with a progressbar
-pub fn move_item_pbr(path: &Path, target: &Path) -> Result<()> {
-    let pbr = Rc::new(RefCell::new(None));
-
-    let update_pbr = |copied, total, item_name: &str| {
-        let mut pbr = pbr.borrow_mut();
-        let pbr = pbr.get_or_insert_with(|| {
-            let pbr = ProgressBar::new(total);
-            pbr.set_style(ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
-            .expect("Invalid progress bar template")
-            .progress_chars("#>-"));
-            pbr
-        });
-
-        pbr.set_position(copied);
-        pbr.set_message(item_name.to_string());
-    };
-
-    if path.metadata()?.is_file() {
-        let file_name = path.file_name().unwrap().to_string_lossy();
-
-        fs_extra::file::move_file_with_progress(
-            path,
-            target,
-            &fs_extra::file::CopyOptions::new(),
-            |tp| {
-                update_pbr(tp.copied_bytes, tp.total_bytes, &file_name);
-            },
-        )?;
-    } else {
-        let mut config = fs_extra::dir::CopyOptions::new();
-        config.copy_inside = true;
-        fs_extra::dir::move_dir_with_progress(path, target, &config, |tp| {
-            update_pbr(tp.copied_bytes, tp.total_bytes, &tp.file_name);
-            TransitProcessResult::ContinueOrAbort
-        })?;
+impl TrashedItem {
+    /// Get the trash path for an item that's going to be transferred to it
+    pub fn transfer_trash_item_path(&self) -> PathBuf {
+        self.trash_dir
+            .join(TRASH_TRANSFER_DIRNAME)
+            .join(self.data.trash_filename())
     }
 
-    let mut pbr = pbr.borrow_mut();
-    let pbr = pbr.as_mut();
-
-    if let Some(pbr) = pbr {
-        pbr.finish_with_message("Moving complete.")
+    pub fn complete_trash_item_path(&self) -> PathBuf {
+        self.trash_dir.join(self.data.trash_filename())
     }
-
-    Ok(())
 }
 
 /// Trash items found with the [`expect_trash_item`] function
 pub enum FoundTrashItems {
-    Single(TrashItem),
-    Multi(Vec<TrashItem>),
+    Single(TrashedItem),
+    Multi(Vec<TrashedItem>),
 }
 
 /// Details on a filesystem item returned by the [`get_fs_details`] function
@@ -359,4 +346,53 @@ pub fn is_dangerous_path(path: &Path) -> bool {
         // Non-dangerous paths
         _ => false,
     }
+}
+
+/// Move items around with a progressbar
+pub fn move_item_pbr(path: &Path, target: &Path) -> Result<()> {
+    let pbr = Rc::new(RefCell::new(None));
+
+    let update_pbr = |copied, total, item_name: &str| {
+        let mut pbr = pbr.borrow_mut();
+        let pbr = pbr.get_or_insert_with(|| {
+            let pbr = ProgressBar::new(total);
+            pbr.set_style(ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+            .expect("Invalid progress bar template")
+            .progress_chars("#>-"));
+            pbr
+        });
+
+        pbr.set_position(copied);
+        pbr.set_message(item_name.to_string());
+    };
+
+    if path.metadata()?.is_file() {
+        let file_name = path.file_name().unwrap().to_string_lossy();
+
+        fs_extra::file::move_file_with_progress(
+            path,
+            target,
+            &fs_extra::file::CopyOptions::new(),
+            |tp| {
+                update_pbr(tp.copied_bytes, tp.total_bytes, &file_name);
+            },
+        )?;
+    } else {
+        let mut config = fs_extra::dir::CopyOptions::new();
+        config.copy_inside = true;
+        fs_extra::dir::move_dir_with_progress(path, target, &config, |tp| {
+            update_pbr(tp.copied_bytes, tp.total_bytes, &tp.file_name);
+            TransitProcessResult::ContinueOrAbort
+        })?;
+    }
+
+    let mut pbr = pbr.borrow_mut();
+    let pbr = pbr.as_mut();
+
+    if let Some(pbr) = pbr {
+        pbr.finish_with_message("Moving complete.")
+    }
+
+    Ok(())
 }

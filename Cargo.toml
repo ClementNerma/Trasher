@@ -1,6 +1,6 @@
 [package]
 name = "trasher"
-version = "2.1.1"
+version = "3.0.1"
 authors = ["Clément Nerma <clement.nerma@gmail.com>"]
 edition = "2021"
 license = "Apache-2.0"
@@ -18,10 +18,12 @@ chrono = "0.4.31"
 regex = "1.9.5"
 crc-any = "2.4.3"
 base64 = "0.21.4"
-fs_extra = "1.3.0"
-indicatif = "0.17.7"
 once_cell = "1.18.0"
 anyhow = "1.0.75"
 ratatui = "0.23.0"
 crossterm = { version = "0.27.0", default-features = false }
 tui-input = "0.8.0"
+dirs = "5.0.1"
+mountpoints = "0.2.1"
+indicatif = "0.17.7"
+fs_extra = "1.3.0"
