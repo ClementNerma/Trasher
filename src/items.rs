@@ -91,7 +91,7 @@ impl TrashItemInfos {
         let decoded = Self::new(captured["filename"].to_string(), timezoned);
 
         if decoded.id != captured["id"] {
-            Err(TrashItemDecodingError::IDDoesNotMatch {
+            Err(TrashItemDecodingError::IdDoesNotMatch {
                 found: captured["id"].to_string(),
                 expected: decoded.id,
             })
@@ -105,7 +105,7 @@ pub enum TrashItemDecodingError {
     InvalidFilenameFormat,
     InvalidDateTime(chrono::ParseError),
     TimezoneDecodingError,
-    IDDoesNotMatch { found: String, expected: String },
+    IdDoesNotMatch { found: String, expected: String },
 }
 
 impl fmt::Debug for TrashItemDecodingError {
@@ -119,7 +119,7 @@ impl fmt::Debug for TrashItemDecodingError {
                     format!("Invalid date/time in file name: {:?}", err.to_string()),
                 Self::TimezoneDecodingError =>
                     "Date/time is invalid for the local timezone".to_string(),
-                Self::IDDoesNotMatch { found, expected } =>
+                Self::IdDoesNotMatch { found, expected } =>
                     format!("Found ID '{}' but expected one was '{}'", found, expected),
             }
         )
