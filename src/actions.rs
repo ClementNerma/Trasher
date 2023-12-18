@@ -97,7 +97,7 @@ pub fn remove(action: MoveToTrash) -> Result<()> {
             }
         };
 
-        let trash_item = TrashItem::new_now(filename.to_string());
+        let trash_item = TrashItemInfos::new_now(filename.to_string());
 
         debug!(
             "Moving item to trash under name '{}'...",

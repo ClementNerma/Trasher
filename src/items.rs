@@ -18,13 +18,13 @@ static DECODER: Lazy<Regex> = Lazy::new(|| {
 static DATETIME_FORMAT: &str = "%Y.%m.%d_%Hh%Mm%Ss.%f%z";
 
 #[derive(Debug, Clone)]
-pub struct TrashItem {
+pub struct TrashItemInfos {
     pub id: String,
     pub filename: String,
     pub datetime: DateTime<Local>,
 }
 
-impl TrashItem {
+impl TrashItemInfos {
     pub fn new(filename: String, datetime: DateTime<Local>) -> Self {
         Self {
             id: Self::hash(datetime),
@@ -72,7 +72,7 @@ impl TrashItem {
         )
     }
 
-    pub fn decode(final_name: &str) -> Result<TrashItem, TrashItemDecodingError> {
+    pub fn decode(final_name: &str) -> Result<TrashItemInfos, TrashItemDecodingError> {
         let captured = DECODER
             .captures(final_name)
             .ok_or(TrashItemDecodingError::InvalidFilenameFormat)?;
