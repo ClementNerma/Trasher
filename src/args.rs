@@ -49,13 +49,6 @@ pub enum Action {
 pub struct ListTrashItems {
     #[clap(long, help = "Only list occurrences of items with a specific name")]
     pub name: Option<String>,
-
-    #[clap(
-        short,
-        long,
-        help = "Show details (size, number of files and directories)"
-    )]
-    pub details: bool,
 }
 
 #[derive(Parser)]
