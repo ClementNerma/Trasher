@@ -23,7 +23,7 @@ use std::rc::Rc;
 const TRASH_DIR_NAME: &str = ".trasher";
 
 /// Name of the transfer directory in the trash
-pub const TRASH_TRANSFER_DIRNAME: &str = "#PARTIAL";
+pub const TRASH_TRANSFER_DIRNAME: &str = ".#PARTIAL";
 
 /// Determine path to the trash directory for a given item and create it if required
 pub fn determine_trash_dir_for(item: &Path) -> Result<PathBuf> {
