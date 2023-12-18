@@ -10,7 +10,6 @@ use super::{bail, debug};
 
 use std::fs;
 use std::io::stdin;
-use std::io::ErrorKind;
 use std::path::PathBuf;
 
 pub fn list(action: ListTrashItems) -> Result<()> {
@@ -97,11 +96,11 @@ pub fn remove(action: MoveToTrash) -> Result<()> {
             }
         };
 
-        let trash_item = TrashItemInfos::new_now(filename.to_string());
+        let data = TrashItemInfos::new_now(filename.to_string());
 
         debug!(
             "Moving item to trash under name '{}'...",
-            trash_item.trash_filename()
+            data.trash_filename()
         );
 
         let trash_dir = determine_trash_dir_for(&path).with_context(|| {
@@ -111,43 +110,42 @@ pub fn remove(action: MoveToTrash) -> Result<()> {
             )
         })?;
 
-        let trash_item = TrashedItem {
-            data: trash_item,
-            trash_dir,
-        };
+        if !trash_dir.exists() {
+            fs::create_dir(&trash_dir).with_context(|| {
+                format!(
+                    "Failed to create trash directory at path '{}'",
+                    trash_dir.display()
+                )
+            })?;
 
-        let trash_item_path = trash_item.transfer_trash_item_path();
-
-        if let Err(err) = fs::rename(&path, &trash_item_path) {
-            debug!("Renaming failed: {:?}", err);
-
-            // HACK: *MUST* be removed when this issue is resolved: https://github.com/rust-lang/rust/issues/86442
-            if err.kind().to_string() == "cross-device link or rename" {
-                bail!("Failed to move item to trash: {}\n\nDetails: tried to move item:\n   {}\n-> {}", err, path.display(), trash_item_path.display());
-            } else if err.kind() != ErrorKind::Other {
-                bail!(
-                    "An error occured while trying to move item to trash: {}",
-                    err
-                );
-            }
+            fs::create_dir(&trash_dir.join(TRASH_TRANSFER_DIRNAME)).with_context(|| {
+                format!(
+                    "Failed to create trash's partial transfer directory at path '{}'",
+                    trash_dir.join(TRASH_TRANSFER_DIRNAME).display()
+                )
+            })?;
         }
 
-        let mut rename_errors = 0;
+        let trash_item = TrashedItem { data, trash_dir };
+        let trash_item_path = trash_item.transfer_trash_item_path();
 
-        while let Err(err) = move_transferred_trash_item(&trash_item) {
-            rename_errors += 1;
+        if !are_on_same_fs(&path, &trash_item_path)? {
+            todo!("moving across FS with move_pbr");
+        }
 
-            debug!(
-                "Failed to rename transferred item in trash (try n°{}): {}",
-                rename_errors, err
-            );
+        fs::rename(&path, &trash_item_path)
+            .with_context(|| format!("Failed to move item '{}' to trash", path.display()))?;
 
-            if rename_errors == 5 {
-                bail!(
-                    "Failed to rename transferred item in trash after {} tries: {}",
-                    rename_errors,
-                    err
+        for i in 1..=3 {
+            if let Err(err) = move_transferred_trash_item(&trash_item) {
+                debug!(
+                    "Failed to rename transferred item in trash (try n°{}): {}",
+                    i, err
                 );
+
+                if i == 3 {
+                    bail!("Failed to move item '{}' to trash: {err:?}", path.display());
+                }
             }
         }
     }
