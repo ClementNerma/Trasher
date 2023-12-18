@@ -18,7 +18,7 @@ pub fn list(action: ListTrashItems) -> Result<()> {
 
     debug!("Listing trash items...");
 
-    let mut items = list_all_trash_items(true)?;
+    let mut items = list_all_trash_items()?;
 
     if items.is_empty() {
         println!("All trashes are empty.");
@@ -247,7 +247,7 @@ pub fn restore(action: RestoreItem) -> Result<()> {
 }
 
 pub fn restore_with_ui() -> Result<()> {
-    let items = list_all_trash_items(false)?;
+    let items = list_all_trash_items()?;
 
     if items.is_empty() {
         println!("Trash is empty");

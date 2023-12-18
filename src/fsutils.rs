@@ -100,8 +100,8 @@ pub fn list_trash_dirs() -> Result<BTreeSet<PathBuf>> {
 }
 
 /// List and parse all items in the trash
-pub fn list_trash_items(trash_dir: &Path, ignore_if_no_trash: bool) -> Result<Vec<TrashedItem>> {
-    if ignore_if_no_trash && !trash_dir.exists() {
+pub fn list_trash_items(trash_dir: &Path) -> Result<Vec<TrashedItem>> {
+    if !trash_dir.exists() {
         return Ok(vec![]);
     }
 
@@ -150,22 +150,22 @@ pub fn list_trash_items(trash_dir: &Path, ignore_if_no_trash: bool) -> Result<Ve
 }
 
 /// List all trash items
-pub fn list_all_trash_items(ignore_if_no_trash: bool) -> Result<Vec<TrashedItem>> {
+pub fn list_all_trash_items() -> Result<Vec<TrashedItem>> {
     let all_trash_items = list_trash_dirs()?
         .into_iter()
-        .map(|trash_dir| list_trash_items(&trash_dir, ignore_if_no_trash))
+        .map(|trash_dir| list_trash_items(&trash_dir))
         .collect::<Result<Vec<_>, _>>()?;
 
     let mut items = all_trash_items.into_iter().flatten().collect::<Vec<_>>();
 
-    items.sort_by(|a, b| a.data.datetime().cmp(b.data.datetime()).reverse());
+    items.sort_by(|a, b| a.data.datetime().cmp(b.data.datetime()));
 
     Ok(items)
 }
 
 /// Find a specific item in the trash (panic if not found)
 pub fn expect_trash_item(filename: &str, id: Option<&str>) -> Result<FoundTrashItems> {
-    let mut candidates = list_all_trash_items(false)?
+    let mut candidates = list_all_trash_items()?
         .into_iter()
         .filter(|trashed| trashed.data.filename() == filename)
         .collect::<Vec<_>>();
