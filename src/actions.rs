@@ -336,9 +336,7 @@ pub fn restore_with_ui() -> Result<()> {
     Ok(())
 }
 
-pub fn empty(action: EmptyTrash) -> Result<()> {
-    let EmptyTrash {} = action;
-
+pub fn empty() -> Result<()> {
     let current_dir =
         std::env::current_dir().context("Failed to determine path to the current directory")?;
 
@@ -375,6 +373,17 @@ pub fn empty(action: EmptyTrash) -> Result<()> {
     })?;
 
     println!("Trash was successfully emptied.");
+
+    Ok(())
+}
+
+pub fn trash_path() -> Result<()> {
+    let current_dir =
+        std::env::current_dir().context("Failed to determine path to the current directory")?;
+
+    let trash_dir = determine_trash_dir_for(&current_dir)?;
+
+    println!("{}", trash_dir.display());
 
     Ok(())
 }

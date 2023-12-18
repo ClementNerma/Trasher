@@ -40,7 +40,8 @@ fn inner_main() -> Result<()> {
         Action::Drop(args) => actions::drop(args)?,
         Action::PathOf(args) => actions::path_of(args)?,
         Action::Restore(args) => actions::restore(args)?,
-        Action::Empty(args) => actions::empty(args)?,
+        Action::Empty => actions::empty()?,
+        Action::TrashPath => actions::trash_path()?,
     }
 
     Ok(())

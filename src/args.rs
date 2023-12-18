@@ -35,8 +35,14 @@ pub enum Action {
     )]
     PathOf(GetItemPath),
 
+    #[clap(
+        name = "trash-path",
+        about = "Get the path of the trash directory for the current folder"
+    )]
+    TrashPath,
+
     #[clap(name = "empty", about = "Permanently delete all items in the trash")]
-    Empty(EmptyTrash),
+    Empty,
 }
 
 #[derive(Parser)]
@@ -125,6 +131,3 @@ pub struct GetItemPath {
     )]
     pub allow_invalid_utf8_path: bool,
 }
-
-#[derive(Parser)]
-pub struct EmptyTrash {}

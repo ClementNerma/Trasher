@@ -58,6 +58,27 @@ pub fn determine_mountpoint_for(item: &Path) -> Result<Option<PathBuf>> {
             continue;
         }
 
+        let mt = fs::metadata(mountpoint).with_context(|| {
+            format!(
+                "Failed to get metadata on mountpoint: {}",
+                mountpoint.display()
+            )
+        })?;
+
+        if mt.permissions().readonly() {
+            continue;
+        }
+
+        #[cfg(target_family = "unix")]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            // Skip directories without write permissions
+            if mt.permissions().mode() & 0o222 == 0 {
+                continue;
+            }
+        }
+
         let canon_mountpoint = fs::canonicalize(mountpoint).with_context(|| {
             format!(
                 "Failed to canonicalize mountpoint: {}",
