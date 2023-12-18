@@ -225,10 +225,9 @@ pub fn restore(action: RestoreItem) -> Result<()> {
         bail!("Target path already exists.");
     }
 
-    let trash_file_mountpoint = determine_mountpoint_for(&item_path)?;
-    let target_path_mountpoint = determine_mountpoint_for(&target_path)?;
+    let target_parent = target_path.parent().unwrap();
 
-    let result = if trash_file_mountpoint == target_path_mountpoint {
+    let result = if are_on_same_fs(&item.complete_trash_item_path(), target_parent)? {
         debug!("Restoring item from trash...");
 
         fs::rename(item_path, &target_path).context("Rename operation failed")

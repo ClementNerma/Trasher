@@ -387,3 +387,31 @@ pub fn table_for_items(items: &[TrashedItem]) -> Table {
 
     table
 }
+
+pub fn are_on_same_fs(a: &Path, b: &Path) -> Result<bool> {
+    fn get_dev(item: &Path) -> Result<u64> {
+        let mt = fs::metadata(item)?;
+
+        #[cfg(target_family = "windows")]
+        {
+            use std::os::windows::fs::MetadataExt;
+            mt.volume_serial_number()
+                .map(u64::from)
+                .context("Item does not have a volume serial number attached")
+        }
+
+        #[cfg(target_family = "unix")]
+        {
+            use std::os::unix::fs::MetadataExt;
+            Ok(mt.dev())
+        }
+    }
+
+    let a_fs_id = get_dev(a)
+        .with_context(|| format!("Failed to get filesystem ID for item '{}'", a.display()))?;
+
+    let b_fs_id = get_dev(b)
+        .with_context(|| format!("Failed to get filesystem ID for item '{}'", b.display()))?;
+
+    Ok(a_fs_id == b_fs_id)
+}
