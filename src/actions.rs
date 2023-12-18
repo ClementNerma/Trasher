@@ -257,7 +257,11 @@ pub fn restore_with_ui() -> Result<()> {
         items
             .into_iter()
             .map(|item| FuzzyFinderItem {
-                display: format!("[{}] {}", item.data.datetime(), item.data.filename()),
+                display: format!(
+                    "[{}] {}",
+                    item.data.datetime().to_rfc2822(),
+                    item.data.filename()
+                ),
                 value: item,
             })
             .collect(),
