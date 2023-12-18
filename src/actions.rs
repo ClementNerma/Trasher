@@ -14,70 +14,28 @@ use std::io::ErrorKind;
 use std::path::PathBuf;
 
 pub fn list(action: ListTrashItems) -> Result<()> {
-    let ListTrashItems { name, details } = action;
+    let ListTrashItems { name } = action;
 
     debug!("Listing trash items...");
 
-    let mut items = list_all_trash_items()?.collect::<Vec<_>>();
+    let mut items = list_all_trash_items(true)?;
+
+    if items.is_empty() {
+        println!("All trashes are empty.");
+        return Ok(());
+    }
 
     if let Some(name) = &name {
         debug!("Filtering {} items by name...", items.len());
         items.retain(|trashed| trashed.data.filename().contains(name));
-    }
 
-    items.sort_by(|a, b| a.data.datetime().cmp(b.data.datetime()));
-
-    match items.len() {
-        0 => println!(
-            "{}",
-            if name.is_some() {
-                "No item in trash match the provided name."
-            } else {
-                "Trash is empty."
-            }
-        ),
-        count => {
-            println!(
-                "Found {} item{} in trash:",
-                count,
-                if count >= 2 { "s" } else { "" }
-            );
-
-            let mut total_size = 0;
-            let mut total_dirs = 0;
-            let mut total_files = 0;
-
-            for item in items {
-                let TrashedItem { data, trash_dir } = &item;
-
-                println!(
-                    "* {data}{}",
-                    if details {
-                        let details = get_fs_details(item.complete_trash_item_path())?;
-
-                        let dir_one = if details.is_dir { 1 } else { 0 };
-
-                        total_size += details.size;
-                        total_dirs += details.sub_files + dir_one;
-                        total_files += details.sub_files + (1 - dir_one);
-
-                        format!("{}, trash dir: {}", details, trash_dir.display())
-                    } else {
-                        "".to_string()
-                    }
-                );
-            }
-
-            if details {
-                println!(
-                    "{} directories, {} files, total size is: {}",
-                    total_dirs,
-                    total_files,
-                    human_readable_size(total_size)
-                );
-            }
+        if items.is_empty() {
+            println!("No item in trash match the provided name.");
+            return Ok(());
         }
     }
+
+    println!("{}", table_for_items(&items));
 
     Ok(())
 }
@@ -139,14 +97,7 @@ pub fn remove(action: MoveToTrash) -> Result<()> {
             }
         };
 
-        let item_metadata = path.metadata().with_context(|| {
-            format!(
-                "Failed to get metadata for item at path '{}'",
-                path.to_string_lossy(),
-            )
-        })?;
-
-        let trash_item = TrashItem::new_now(filename.to_string(), Some(item_metadata.file_type()));
+        let trash_item = TrashItem::new_now(filename.to_string());
 
         debug!(
             "Moving item to trash under name '{}'...",
@@ -259,63 +210,49 @@ pub fn restore(action: RestoreItem) -> Result<()> {
         return restore_with_ui();
     };
 
-    match expect_trash_item(&filename, id.as_deref())? {
-        FoundTrashItems::Single(item) => {
-            let item_path = item.complete_trash_item_path();
+    let item = expect_single_trash_item(&filename, id.as_deref())?;
 
-            let target_path = match to {
-                Some(to) => to,
-                None => std::env::current_dir()?,
-            };
+    let item_path = item.complete_trash_item_path();
 
-            let target_path = target_path.join(item.data.filename());
+    let target_path = match to {
+        Some(to) => to,
+        None => std::env::current_dir()?,
+    };
 
-            if target_path.exists() {
-                bail!("Target path already exists.");
-            }
+    let target_path = target_path.join(item.data.filename());
 
-            let trash_file_mountpoint = determine_mountpoint_for(&item_path)?;
-            let target_path_mountpoint = determine_mountpoint_for(&target_path)?;
-
-            let result = if trash_file_mountpoint == target_path_mountpoint {
-                debug!("Restoring item from trash...");
-
-                fs::rename(item_path, &target_path).context("Rename operation failed")
-            } else {
-                println!("Moving file across filesystems...");
-
-                move_item_pbr(&item_path, &target_path)
-            };
-
-            if let Err(err) = result {
-                bail!(
-                    "Failed to restore item '{}' from trash: {err:?}",
-                    item.data.filename(),
-                )
-            }
-        }
-
-        FoundTrashItems::Multi(candidates) => println!(
-            "Multiple items with this filename were found in the trash:{}",
-            candidates
-                .iter()
-                .map(|trashed| format!("\n* {}", trashed.data))
-                .collect::<String>()
-        ),
+    if target_path.exists() {
+        bail!("Target path already exists.");
     }
 
-    Ok(())
+    let trash_file_mountpoint = determine_mountpoint_for(&item_path)?;
+    let target_path_mountpoint = determine_mountpoint_for(&target_path)?;
+
+    let result = if trash_file_mountpoint == target_path_mountpoint {
+        debug!("Restoring item from trash...");
+
+        fs::rename(item_path, &target_path).context("Rename operation failed")
+    } else {
+        println!("Moving file across filesystems...");
+
+        move_item_pbr(&item_path, &target_path)
+    };
+
+    result.with_context(|| {
+        format!(
+            "Failed to restore item '{}' from trash",
+            item.data.filename()
+        )
+    })
 }
 
 pub fn restore_with_ui() -> Result<()> {
-    let mut items = list_all_trash_items()?.collect::<Vec<_>>();
+    let items = list_all_trash_items(false)?;
 
     if items.is_empty() {
         println!("Trash is empty");
         return Ok(());
     }
-
-    items.sort_by(|a, b| a.data.datetime().cmp(b.data.datetime()));
 
     let to_remove = crate::fuzzy::run_fuzzy_finder(
         items

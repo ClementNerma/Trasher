@@ -4,6 +4,9 @@ use super::items::TrashItem;
 use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
+use comfy_table::presets::UTF8_FULL_CONDENSED;
+use comfy_table::ContentArrangement;
+use comfy_table::Table;
 use fs_extra::dir::TransitProcessResult;
 use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
@@ -11,7 +14,6 @@ use mountpoints::mountpaths;
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
-use std::fmt;
 use std::fs;
 use std::path::Component;
 use std::path::{Path, PathBuf};
@@ -32,18 +34,7 @@ pub fn determine_trash_dir_for(item: &Path) -> Result<PathBuf> {
         None => dirs::home_dir().context("Failed to determine path to user's home directory")?,
     };
 
-    let trash_dir_path = parent_dir.join(TRASH_DIR_NAME);
-
-    if !trash_dir_path.exists() {
-        fs::create_dir_all(trash_dir_path.join(TRASH_TRANSFER_DIRNAME)).with_context(|| {
-            format!(
-                "Failed to create trash directory (with transfer directory) at: {}",
-                trash_dir_path.display()
-            )
-        })?;
-    }
-
-    Ok(trash_dir_path)
+    Ok(parent_dir.join(TRASH_DIR_NAME))
 }
 
 /// Determine the (canonicalized) path to the mountpoint the provided path is on
@@ -109,7 +100,11 @@ pub fn list_trash_dirs() -> Result<BTreeSet<PathBuf>> {
 }
 
 /// List and parse all items in the trash
-pub fn list_trash_items(trash_dir: &Path) -> Result<Vec<TrashedItem>> {
+pub fn list_trash_items(trash_dir: &Path, ignore_if_no_trash: bool) -> Result<Vec<TrashedItem>> {
+    if ignore_if_no_trash && !trash_dir.exists() {
+        return Ok(vec![]);
+    }
+
     let dir_entries = fs::read_dir(trash_dir)
         .context("Failed to read trash directory")?
         .collect::<Result<Vec<_>, _>>()?;
@@ -128,7 +123,7 @@ pub fn list_trash_items(trash_dir: &Path) -> Result<Vec<TrashedItem>> {
                         return None;
                     }
 
-                    match TrashItem::decode(&filename, Some(item.file_type().unwrap())) {
+                    match TrashItem::decode(&filename) {
                         Err(err) => {
                             eprintln!(
                                 "WARN: Trash item '{}' does not have a valid trash filename!",
@@ -155,18 +150,23 @@ pub fn list_trash_items(trash_dir: &Path) -> Result<Vec<TrashedItem>> {
 }
 
 /// List all trash items
-pub fn list_all_trash_items() -> Result<impl Iterator<Item = TrashedItem>> {
+pub fn list_all_trash_items(ignore_if_no_trash: bool) -> Result<Vec<TrashedItem>> {
     let all_trash_items = list_trash_dirs()?
         .into_iter()
-        .map(|trash_dir| list_trash_items(&trash_dir))
+        .map(|trash_dir| list_trash_items(&trash_dir, ignore_if_no_trash))
         .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(all_trash_items.into_iter().flatten())
+    let mut items = all_trash_items.into_iter().flatten().collect::<Vec<_>>();
+
+    items.sort_by(|a, b| a.data.datetime().cmp(b.data.datetime()).reverse());
+
+    Ok(items)
 }
 
 /// Find a specific item in the trash (panic if not found)
 pub fn expect_trash_item(filename: &str, id: Option<&str>) -> Result<FoundTrashItems> {
-    let mut candidates = list_all_trash_items()?
+    let mut candidates = list_all_trash_items(false)?
+        .into_iter()
         .filter(|trashed| trashed.data.filename() == filename)
         .collect::<Vec<_>>();
 
@@ -192,62 +192,10 @@ pub fn expect_single_trash_item(filename: &str, id: Option<&str>) -> Result<Tras
     match expect_trash_item(filename, id)? {
         FoundTrashItems::Single(item) => Ok(item),
         FoundTrashItems::Multi(candidates) => bail!(
-            "Multiple items with this filename were found in the trash:{}",
-            candidates
-                .iter()
-                .map(|TrashedItem { data, trash_dir }| format!(
-                    "\n* {data} (from {})",
-                    trash_dir.display()
-                ))
-                .collect::<String>()
+            "Multiple items with this filename were found in the trash:\n\n{}",
+            table_for_items(&candidates)
         ),
     }
-}
-
-/// Get details on a filesystem item
-pub fn get_fs_details(path: impl AsRef<Path>) -> Result<FSDetails> {
-    let metadata = fs::metadata(&path)?;
-
-    let is_dir = metadata.is_dir();
-
-    if metadata.file_type().is_symlink() {
-        return Ok(FSDetails {
-            is_symlink: true,
-            is_dir,
-            sub_directories: 0,
-            sub_files: 0,
-            size: 0,
-        });
-    }
-
-    if !is_dir {
-        return Ok(FSDetails {
-            is_symlink: false,
-            is_dir: false,
-            sub_directories: 0,
-            sub_files: 0,
-            size: metadata.len(),
-        });
-    }
-
-    let mut details = FSDetails {
-        is_symlink: false,
-        is_dir: true,
-        sub_directories: 0,
-        sub_files: 0,
-        size: 0,
-    };
-
-    for item in fs::read_dir(&path)? {
-        let item_details = get_fs_details(item?.path())?;
-        let dir_one = if item_details.is_dir { 1 } else { 0 };
-
-        details.sub_directories += item_details.sub_directories + dir_one;
-        details.sub_files += item_details.sub_files + (1 - dir_one);
-        details.size += item_details.size;
-    }
-
-    Ok(details)
 }
 
 /// Move a partial item to the trash's main directory once the transfer is complete
@@ -309,42 +257,6 @@ impl TrashedItem {
 pub enum FoundTrashItems {
     Single(TrashedItem),
     Multi(Vec<TrashedItem>),
-}
-
-/// Details on a filesystem item returned by the [`get_fs_details`] function
-pub struct FSDetails {
-    pub is_symlink: bool,
-    pub is_dir: bool,
-    pub sub_directories: u64,
-    pub sub_files: u64,
-    pub size: u64,
-}
-
-impl fmt::Display for FSDetails {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            " | [{}] Size: {}{}",
-            if self.is_symlink {
-                "Symlink"
-            } else if self.is_dir {
-                "Directory"
-            } else {
-                "File"
-            },
-            human_readable_size(self.size),
-            if self.is_dir {
-                format!(
-                    ", Items: {}, Directories: {}, Files: {}",
-                    self.sub_directories + self.sub_files,
-                    self.sub_directories,
-                    self.sub_files
-                )
-            } else {
-                "".to_string()
-            }
-        )
-    }
 }
 
 // Check if a path is dangerous to delete
@@ -420,4 +332,58 @@ pub fn move_item_pbr(path: &Path, target: &Path) -> Result<()> {
     }
 
     Ok(())
+}
+
+pub fn table_for_items(items: &[TrashedItem]) -> Table {
+    let mut table = Table::new();
+
+    table
+        .load_preset(UTF8_FULL_CONDENSED)
+        .set_content_arrangement(ContentArrangement::Dynamic)
+        .set_header(vec![
+            "Type",
+            "Filename",
+            "Size",
+            "ID",
+            "Deleted on",
+            "Trash directory",
+        ]);
+
+    for item in items {
+        let TrashedItem { data, trash_dir } = item;
+
+        let TrashItem {
+            id,
+            filename,
+            datetime,
+        } = data;
+
+        let mt = fs::metadata(item.complete_trash_item_path());
+
+        table.add_row(vec![
+            match &mt {
+                Ok(mt) => {
+                    if mt.file_type().is_file() {
+                        "File"
+                    } else if mt.file_type().is_dir() {
+                        "Directory"
+                    } else {
+                        "<Unknown>"
+                    }
+                }
+                Err(_) => "ERROR",
+            }
+            .to_string(),
+            filename.clone(),
+            match &mt {
+                Ok(mt) => human_readable_size(mt.len()),
+                Err(_) => "ERROR".to_owned(),
+            },
+            id.clone(),
+            datetime.to_rfc2822(),
+            trash_dir.to_string_lossy().into_owned(),
+        ]);
+    }
+
+    table
 }

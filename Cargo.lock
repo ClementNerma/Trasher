@@ -192,6 +192,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "acbf1af155f9b9ef647e42cdc158db4b64a1b61f743629225fde6f3e0be2a7c7"
 
 [[package]]
+name = "comfy-table"
+version = "7.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c64043d6c7b7a4c58e39e7efccfdea7b93d885a795d0c054a69dbbf4dd52686"
+dependencies = [
+ "crossterm",
+ "strum",
+ "strum_macros",
+ "unicode-width",
+]
+
+[[package]]
 name = "console"
 version = "0.15.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -706,12 +718,13 @@ dependencies = [
 
 [[package]]
 name = "trasher"
-version = "3.0.3"
+version = "3.1.0"
 dependencies = [
  "anyhow",
  "base64",
  "chrono",
  "clap",
+ "comfy-table",
  "crc-any",
  "crossterm",
  "dirs",
