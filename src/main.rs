@@ -2,6 +2,8 @@
 #![forbid(unused_must_use)]
 #![warn(unused_crate_dependencies)]
 #![allow(clippy::format_collect)]
+// NOTE: NIGHTLY
+#![cfg_attr(target_family = "windows", feature(windows_by_handle))]
 
 mod actions;
 mod args;
