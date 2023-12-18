@@ -198,16 +198,6 @@ pub fn expect_single_trash_item(filename: &str, id: Option<&str>) -> Result<Tras
     }
 }
 
-/// Move a partial item to the trash's main directory once the transfer is complete
-pub fn move_transferred_trash_item(item: &TrashedItem) -> Result<()> {
-    fs::rename(
-        item.transfer_trash_item_path(),
-        item.complete_trash_item_path(),
-    )?;
-
-    Ok(())
-}
-
 /// Convert a size in bytes to a human-readable size
 pub fn human_readable_size(bytes: u64) -> String {
     let names = ["KiB", "MiB", "GiB", "TiB", "PiB", "EiB"];
