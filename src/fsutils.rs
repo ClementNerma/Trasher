@@ -54,6 +54,10 @@ pub fn determine_mountpoint_for(item: &Path) -> Result<Option<PathBuf>> {
     let mountpoints = mountpaths().context("Failed to list system mountpoints")?;
 
     for mountpoint in &mountpoints {
+        if mountpoint.to_str() == Some("/") {
+            continue;
+        }
+
         let canon_mountpoint = fs::canonicalize(mountpoint).with_context(|| {
             format!(
                 "Failed to canonicalize mountpoint: {}",
