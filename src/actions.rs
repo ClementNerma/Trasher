@@ -126,12 +126,12 @@ pub fn remove(action: MoveToTrash) -> Result<()> {
             })?;
         }
 
-        let trash_item = TrashedItem { data, trash_dir };
-        let trash_item_path = trash_item.transfer_trash_item_path();
-
-        if !are_on_same_fs(&path, &trash_item_path)? {
+        if !are_on_same_fs(&path, &trash_dir)? {
             todo!("moving across FS with move_pbr");
         }
+
+        let trash_item = TrashedItem { data, trash_dir };
+        let trash_item_path = trash_item.transfer_trash_item_path();
 
         fs::rename(&path, &trash_item_path)
             .with_context(|| format!("Failed to move item '{}' to trash", path.display()))?;
@@ -224,6 +224,13 @@ pub fn restore(action: RestoreItem) -> Result<()> {
     }
 
     let target_parent = target_path.parent().unwrap();
+
+    if !target_parent.exists() {
+        bail!(
+            "Target directory '{}' does not exist",
+            target_parent.display()
+        );
+    }
 
     let result = if are_on_same_fs(&item.complete_trash_item_path(), target_parent)? {
         debug!("Restoring item from trash...");
