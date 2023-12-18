@@ -117,11 +117,15 @@ pub fn remove(action: MoveToTrash) -> Result<()> {
                     trash_dir.display()
                 )
             })?;
+        }
 
-            fs::create_dir(&trash_dir.join(TRASH_TRANSFER_DIRNAME)).with_context(|| {
+        let trash_transfer_dir = trash_dir.join(TRASH_TRANSFER_DIRNAME);
+
+        if !trash_transfer_dir.exists() {
+            fs::create_dir(&trash_transfer_dir).with_context(|| {
                 format!(
                     "Failed to create trash's partial transfer directory at path '{}'",
-                    trash_dir.join(TRASH_TRANSFER_DIRNAME).display()
+                    trash_transfer_dir.display()
                 )
             })?;
         }
@@ -136,18 +140,12 @@ pub fn remove(action: MoveToTrash) -> Result<()> {
         fs::rename(&path, &trash_item_path)
             .with_context(|| format!("Failed to move item '{}' to trash", path.display()))?;
 
-        for i in 1..=3 {
-            if let Err(err) = move_transferred_trash_item(&trash_item) {
-                debug!(
-                    "Failed to rename transferred item in trash (try n°{}): {}",
-                    i, err
-                );
-
-                if i == 3 {
-                    bail!("Failed to move item '{}' to trash: {err:?}", path.display());
-                }
-            }
-        }
+        fs::rename(&trash_item_path, trash_item.complete_trash_item_path()).with_context(|| {
+            format!(
+                "Failed to move fully transferred item '{}' to trash",
+                path.display()
+            )
+        })?;
     }
 
     Ok(())
