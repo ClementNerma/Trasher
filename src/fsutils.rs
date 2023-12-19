@@ -113,9 +113,9 @@ pub fn list_trash_items(trash_dir: &Path) -> Result<Vec<TrashedItem>> {
         .into_iter()
         .filter_map(|item| {
             match item.file_name().into_string() {
-                Err(invalid_filename) => eprintln!(
+                Err(_) => eprintln!(
                     "WARN: Trash item '{}' does not have a valid UTF-8 filename!",
-                    invalid_filename.to_string_lossy()
+                    item.path().display()
                 ),
 
                 Ok(filename) => {
@@ -127,8 +127,9 @@ pub fn list_trash_items(trash_dir: &Path) -> Result<Vec<TrashedItem>> {
                         Err(err) => {
                             eprintln!(
                                 "WARN: Trash item '{}' does not have a valid trash filename!",
-                                filename
+                                item.path().display()
                             );
+
                             super::debug!("Invalid trash item filename: {:?}", err);
                         }
 
