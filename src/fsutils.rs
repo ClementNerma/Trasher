@@ -53,7 +53,7 @@ pub fn determine_mountpoint_for(item: &Path) -> Result<Option<PathBuf>> {
             Ok(mt) => mt,
             Err(err) => {
                 println!(
-                    "WARN: Failed to get metadata on mountpoint '{}': {err:?}",
+                    "WARN: Trasher failed to get metadata on mountpoint '{}': {err}",
                     mountpoint.display()
                 );
 
