@@ -49,12 +49,17 @@ pub fn determine_mountpoint_for(item: &Path) -> Result<Option<PathBuf>> {
             continue;
         }
 
-        let mt = fs::metadata(mountpoint).with_context(|| {
-            format!(
-                "Failed to get metadata on mountpoint: {}",
-                mountpoint.display()
-            )
-        })?;
+        let mt = match fs::metadata(mountpoint) {
+            Ok(mt) => mt,
+            Err(err) => {
+                println!(
+                    "WARN: Failed to get metadata on mountpoint '{}': {err:?}",
+                    mountpoint.display()
+                );
+
+                continue;
+            }
+        };
 
         if mt.permissions().readonly() {
             continue;
