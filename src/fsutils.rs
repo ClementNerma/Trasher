@@ -49,16 +49,8 @@ pub fn determine_mountpoint_for(item: &Path) -> Result<Option<PathBuf>> {
             continue;
         }
 
-        let mt = match fs::metadata(mountpoint) {
-            Ok(mt) => mt,
-            Err(err) => {
-                println!(
-                    "WARN: Trasher failed to get metadata on mountpoint '{}': {err}",
-                    mountpoint.display()
-                );
-
-                continue;
-            }
+        let Ok(mt) = fs::metadata(mountpoint) else {
+            continue;
         };
 
         if mt.permissions().readonly() {
