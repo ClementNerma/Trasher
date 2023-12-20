@@ -718,7 +718,7 @@ dependencies = [
 
 [[package]]
 name = "trasher"
-version = "3.1.7"
+version = "3.1.8"
 dependencies = [
  "anyhow",
  "base64",
