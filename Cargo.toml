@@ -13,18 +13,18 @@ name = "trasher"
 path = "src/main.rs"
 
 [dependencies]
-clap = { version = "4.4.4", features = ["derive"] }
-chrono = "0.4.31"
-regex = "1.9.5"
-crc-any = "2.4.3"
-base64 = "0.21.4"
-once_cell = "1.18.0"
-anyhow = "1.0.75"
-ratatui = "0.23.0"
+clap = { version = "4.5.3", features = ["derive"] }
+chrono = "0.4.35"
+regex = "1.10.3"
+crc-any = "2.4.4"
+base64 = "0.22.0"
+once_cell = "1.19.0"
+anyhow = "1.0.81"
+ratatui = "0.26.1"
 crossterm = { version = "0.27.0", default-features = false }
 tui-input = "0.8.0"
 dirs = "5.0.1"
 mountpoints = "0.2.1"
-indicatif = "0.17.7"
+indicatif = "0.17.8"
 fs_extra = "1.3.0"
 comfy-table = "7.1.0"
