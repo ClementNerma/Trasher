@@ -7,6 +7,8 @@ license = "Apache-2.0"
 description = "A small command-line utility to replace 'rm' and 'del' by a trash system"
 readme = "README.md"
 repository = "https://github.com/ClementNerma/Trasher"
+categories = ["filesystem", "command-line-utilities"]
+keywords = ["trash", "command-line", "rm"]
 
 [[bin]]
 name = "trasher"
