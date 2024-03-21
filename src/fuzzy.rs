@@ -126,7 +126,7 @@ fn run_app<B: Backend, T: Clone>(terminal: &mut Terminal<B>, mut state: State<T>
     }
 }
 
-fn draw_ui<B: Backend, T: Clone>(f: &mut Frame<B>, state: &mut State<T>) {
+fn draw_ui<T: Clone>(f: &mut Frame, state: &mut State<T>) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(1), Constraint::Length(10)])
