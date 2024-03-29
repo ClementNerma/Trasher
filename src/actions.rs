@@ -6,12 +6,12 @@ use crate::fuzzy::FuzzyFinderItem;
 
 use super::{args::*, bail, debug, fsutils::*, items::*};
 
-pub fn list(action: ListTrashItems) -> Result<()> {
+pub fn list(action: ListTrashItems, config: &Config) -> Result<()> {
     let ListTrashItems { name } = action;
 
     debug!("Listing trash items...");
 
-    let mut items = list_all_trash_items()?;
+    let mut items = list_all_trash_items(config)?;
 
     if items.is_empty() {
         println!("All trashes are empty.");
@@ -33,7 +33,7 @@ pub fn list(action: ListTrashItems) -> Result<()> {
     Ok(())
 }
 
-pub fn remove(action: MoveToTrash) -> Result<()> {
+pub fn remove(action: MoveToTrash, config: &Config) -> Result<()> {
     let MoveToTrash {
         paths,
         permanently,
@@ -97,7 +97,7 @@ pub fn remove(action: MoveToTrash) -> Result<()> {
             data.trash_filename()
         );
 
-        let trash_dir = determine_trash_dir_for(&path).with_context(|| {
+        let trash_dir = determine_trash_dir_for(&path, config).with_context(|| {
             format!(
                 "Failed to determine path to the trash directory for item: {}",
                 path.display()
@@ -145,12 +145,12 @@ pub fn remove(action: MoveToTrash) -> Result<()> {
     Ok(())
 }
 
-pub fn drop(action: DropItem) -> Result<()> {
+pub fn drop(action: DropItem, config: &Config) -> Result<()> {
     let DropItem { filename, id } = action;
 
     debug!("Listing trash items...");
 
-    let item = expect_single_trash_item(&filename, id.as_deref())?;
+    let item = expect_single_trash_item(&filename, id.as_deref(), config)?;
 
     debug!("Permanently removing item from trash...");
 
@@ -162,7 +162,7 @@ pub fn drop(action: DropItem) -> Result<()> {
     })
 }
 
-pub fn path_of(action: GetItemPath) -> Result<()> {
+pub fn path_of(action: GetItemPath, config: &Config) -> Result<()> {
     let GetItemPath {
         filename,
         id,
@@ -171,7 +171,7 @@ pub fn path_of(action: GetItemPath) -> Result<()> {
 
     debug!("Listing trash items...");
 
-    let item = expect_single_trash_item(&filename, id.as_deref())?;
+    let item = expect_single_trash_item(&filename, id.as_deref(), config)?;
     let item_path = item.complete_trash_item_path();
 
     match item_path.to_str() {
@@ -191,16 +191,16 @@ pub fn path_of(action: GetItemPath) -> Result<()> {
     Ok(())
 }
 
-pub fn restore(action: RestoreItem) -> Result<()> {
+pub fn restore(action: RestoreItem, config: &Config) -> Result<()> {
     let RestoreItem { filename, to, id } = action;
 
     debug!("Listing trash items...");
 
     let Some(filename) = filename else {
-        return restore_with_ui();
+        return restore_with_ui(config);
     };
 
-    let item = expect_single_trash_item(&filename, id.as_deref())?;
+    let item = expect_single_trash_item(&filename, id.as_deref(), config)?;
 
     let item_path = item.complete_trash_item_path();
 
@@ -242,8 +242,8 @@ pub fn restore(action: RestoreItem) -> Result<()> {
     })
 }
 
-pub fn restore_with_ui() -> Result<()> {
-    let items = list_all_trash_items()?;
+pub fn restore_with_ui(config: &Config) -> Result<()> {
+    let items = list_all_trash_items(config)?;
 
     if items.is_empty() {
         println!("Trash is empty");
@@ -264,20 +264,23 @@ pub fn restore_with_ui() -> Result<()> {
             .collect(),
     )?;
 
-    restore(RestoreItem {
-        filename: Some(to_remove.data.filename().to_owned()),
-        to: None,
-        id: Some(to_remove.data.id().to_owned()),
-    })?;
+    restore(
+        RestoreItem {
+            filename: Some(to_remove.data.filename().to_owned()),
+            to: None,
+            id: Some(to_remove.data.id().to_owned()),
+        },
+        config,
+    )?;
 
     Ok(())
 }
 
-pub fn empty() -> Result<()> {
+pub fn empty(config: &Config) -> Result<()> {
     let current_dir =
         std::env::current_dir().context("Failed to determine path to the current directory")?;
 
-    let trash_dir = determine_trash_dir_for(&current_dir)?;
+    let trash_dir = determine_trash_dir_for(&current_dir, config)?;
 
     println!(
         "You are about to delete the entire directory of {}",
@@ -314,11 +317,11 @@ pub fn empty() -> Result<()> {
     Ok(())
 }
 
-pub fn trash_path() -> Result<()> {
+pub fn trash_path(config: &Config) -> Result<()> {
     let current_dir =
         std::env::current_dir().context("Failed to determine path to the current directory")?;
 
-    let trash_dir = determine_trash_dir_for(&current_dir)?;
+    let trash_dir = determine_trash_dir_for(&current_dir, config)?;
 
     println!("{}", trash_dir.display());
 

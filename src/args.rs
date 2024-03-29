@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -10,6 +10,19 @@ pub struct Opts {
 
     #[clap(subcommand)]
     pub action: Action,
+
+    #[clap(flatten)]
+    pub config: Config,
+}
+
+#[derive(Args)]
+pub struct Config {
+    #[clap(
+        global = true,
+        long,
+        help = "Disallow making a filesystem-local trash directory in some paths"
+    )]
+    pub exclude: Vec<PathBuf>,
 }
 
 #[derive(Subcommand)]
