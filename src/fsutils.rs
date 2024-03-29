@@ -1,23 +1,22 @@
+use std::{
+    cell::RefCell,
+    collections::BTreeSet,
+    ffi::OsStr,
+    fs,
+    path::Component,
+    path::{Path, PathBuf},
+    rc::Rc,
+};
+
+use anyhow::{bail, Context, Result};
+use comfy_table::{presets::UTF8_FULL_CONDENSED, ContentArrangement, Table};
+use fs_extra::dir::TransitProcessResult;
+use indicatif::{ProgressBar, ProgressStyle};
+use mountpoints::mountpaths;
+
 use crate::debug;
 
 use super::items::TrashItemInfos;
-use anyhow::bail;
-use anyhow::Context;
-use anyhow::Result;
-use comfy_table::presets::UTF8_FULL_CONDENSED;
-use comfy_table::ContentArrangement;
-use comfy_table::Table;
-use fs_extra::dir::TransitProcessResult;
-use indicatif::ProgressBar;
-use indicatif::ProgressStyle;
-use mountpoints::mountpaths;
-use std::cell::RefCell;
-use std::collections::BTreeSet;
-use std::ffi::OsStr;
-use std::fs;
-use std::path::Component;
-use std::path::{Path, PathBuf};
-use std::rc::Rc;
 
 /// Name of the trash directory
 const TRASH_DIR_NAME: &str = ".trasher";
