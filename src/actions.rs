@@ -1,16 +1,10 @@
-use anyhow::Context;
-use anyhow::Result;
+use std::{fs, io::stdin, path::PathBuf};
+
+use anyhow::{Context, Result};
 
 use crate::fuzzy::FuzzyFinderItem;
 
-use super::args::*;
-use super::fsutils::*;
-use super::items::*;
-use super::{bail, debug};
-
-use std::fs;
-use std::io::stdin;
-use std::path::PathBuf;
+use super::{args::*, bail, debug, fsutils::*, items::*};
 
 pub fn list(action: ListTrashItems) -> Result<()> {
     let ListTrashItems { name } = action;

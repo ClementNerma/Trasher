@@ -11,13 +11,14 @@ mod fsutils;
 mod fuzzy;
 mod items;
 
-use anyhow::{bail, Result};
-use args::*;
-use clap::Parser;
 use std::{
     process::ExitCode,
     sync::atomic::{AtomicBool, Ordering},
 };
+
+use anyhow::{bail, Result};
+use args::*;
+use clap::Parser;
 
 fn main() -> ExitCode {
     match inner_main() {

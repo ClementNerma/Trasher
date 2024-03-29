@@ -1,13 +1,10 @@
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use base64::Engine;
-use chrono::prelude::*;
-use chrono::LocalResult;
+use std::{fmt, path::PathBuf, str};
+
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use chrono::{prelude::*, LocalResult};
 use crc_any::CRC;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use std::fmt;
-use std::path::PathBuf;
-use std::str;
 
 static DECODER: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
