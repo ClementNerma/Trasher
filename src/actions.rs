@@ -125,21 +125,30 @@ pub fn remove(action: MoveToTrash, config: &Config) -> Result<()> {
         }
 
         if !are_on_same_fs(&path, &trash_dir)? {
-            todo!("moving across FS with move_pbr");
+            println!("Moving item to trash directory {}", trash_dir.display());
+
+            let transfer_path = trash_transfer_dir.join(data.trash_filename());
+
+            move_item_pbr(&path, &transfer_path).context("Failed to move item to the trash")?;
+
+            fs::rename(&transfer_path, trash_dir.join(data.trash_filename()))
+                .context("Failed to move item to the final trash directory")?;
+        } else {
+            let trash_item = TrashedItem { data, trash_dir };
+            let trash_item_path = trash_item.transfer_trash_item_path();
+
+            fs::rename(&path, &trash_item_path)
+                .with_context(|| format!("Failed to move item '{}' to trash", path.display()))?;
+
+            fs::rename(&trash_item_path, trash_item.complete_trash_item_path()).with_context(
+                || {
+                    format!(
+                        "Failed to move fully transferred item '{}' to trash",
+                        path.display()
+                    )
+                },
+            )?;
         }
-
-        let trash_item = TrashedItem { data, trash_dir };
-        let trash_item_path = trash_item.transfer_trash_item_path();
-
-        fs::rename(&path, &trash_item_path)
-            .with_context(|| format!("Failed to move item '{}' to trash", path.display()))?;
-
-        fs::rename(&trash_item_path, trash_item.complete_trash_item_path()).with_context(|| {
-            format!(
-                "Failed to move fully transferred item '{}' to trash",
-                path.display()
-            )
-        })?;
     }
 
     Ok(())
