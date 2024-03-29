@@ -14,7 +14,7 @@ use fs_extra::dir::TransitProcessResult;
 use indicatif::{ProgressBar, ProgressStyle};
 use mountpoints::mountpaths;
 
-use crate::debug;
+use crate::{debug, Config};
 
 use super::items::TrashItemInfos;
 
@@ -25,10 +25,10 @@ const TRASH_DIR_NAME: &str = ".trasher";
 pub const TRASH_TRANSFER_DIRNAME: &str = ".#PARTIAL";
 
 /// Determine path to the trash directory for a given item and create it if required
-pub fn determine_trash_dir_for(item: &Path) -> Result<PathBuf> {
+pub fn determine_trash_dir_for(item: &Path, config: &Config) -> Result<PathBuf> {
     debug!("Determining trasher directory for item: {}", item.display());
 
-    let parent_dir = match determine_mountpoint_for(item)? {
+    let parent_dir = match determine_mountpoint_for(item, config)? {
         Some(path) => path,
         None => dirs::home_dir().context("Failed to determine path to user's home directory")?,
     };
@@ -37,9 +37,26 @@ pub fn determine_trash_dir_for(item: &Path) -> Result<PathBuf> {
 }
 
 /// Determine the (canonicalized) path to the mountpoint the provided path is on
-pub fn determine_mountpoint_for(item: &Path) -> Result<Option<PathBuf>> {
+pub fn determine_mountpoint_for(item: &Path, config: &Config) -> Result<Option<PathBuf>> {
     let item = fs::canonicalize(item)
         .with_context(|| format!("Failed to canonicalize item path: {}", item.display()))?;
+
+    let exclude = config
+        .exclude
+        .iter()
+        .filter_map(|dir| {
+            if !dir.is_dir() {
+                None
+            } else {
+                Some(fs::canonicalize(dir).with_context(|| {
+                    format!(
+                        "Failed to canonicalize excluded directory: {}",
+                        dir.display()
+                    )
+                }))
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
     let mountpoints = mountpaths().context("Failed to list system mountpoints")?;
 
@@ -73,23 +90,29 @@ pub fn determine_mountpoint_for(item: &Path) -> Result<Option<PathBuf>> {
             )
         })?;
 
-        if item.starts_with(&canon_mountpoint) {
-            return Ok(Some(canon_mountpoint));
+        if !item.starts_with(&canon_mountpoint) {
+            continue;
         }
+
+        if exclude.iter().any(|parent| item.starts_with(parent)) {
+            return Ok(None);
+        }
+
+        return Ok(Some(canon_mountpoint));
     }
 
     Ok(None)
 }
 
 /// List all trash directories
-pub fn list_trash_dirs() -> Result<BTreeSet<PathBuf>> {
+pub fn list_trash_dirs(config: &Config) -> Result<BTreeSet<PathBuf>> {
     let canon_root = fs::canonicalize("/").context("Failed to canonicalize the root directory")?;
 
     let trash_dirs = mountpaths()
         .context("Failed to list system mountpoints")?
         .iter()
         .chain([canon_root].iter())
-        .map(|path| determine_trash_dir_for(path))
+        .map(|path| determine_trash_dir_for(path, config))
         .collect::<Result<BTreeSet<_>, _>>()?;
 
     Ok(trash_dirs)
@@ -147,8 +170,8 @@ pub fn list_trash_items(trash_dir: &Path) -> Result<Vec<TrashedItem>> {
 }
 
 /// List all trash items
-pub fn list_all_trash_items() -> Result<Vec<TrashedItem>> {
-    let all_trash_items = list_trash_dirs()?
+pub fn list_all_trash_items(config: &Config) -> Result<Vec<TrashedItem>> {
+    let all_trash_items = list_trash_dirs(config)?
         .into_iter()
         .map(|trash_dir| list_trash_items(&trash_dir))
         .collect::<Result<Vec<_>, _>>()?;
@@ -161,8 +184,12 @@ pub fn list_all_trash_items() -> Result<Vec<TrashedItem>> {
 }
 
 /// Find a specific item in the trash (panic if not found)
-pub fn expect_trash_item(filename: &str, id: Option<&str>) -> Result<FoundTrashItems> {
-    let mut candidates = list_all_trash_items()?
+pub fn expect_trash_item(
+    filename: &str,
+    id: Option<&str>,
+    config: &Config,
+) -> Result<FoundTrashItems> {
+    let mut candidates = list_all_trash_items(config)?
         .into_iter()
         .filter(|trashed| trashed.data.filename() == filename)
         .collect::<Vec<_>>();
@@ -185,8 +212,12 @@ pub fn expect_trash_item(filename: &str, id: Option<&str>) -> Result<FoundTrashI
 }
 
 /// Find a specific item in the trash, fail if none is found or if multiple candidates are found
-pub fn expect_single_trash_item(filename: &str, id: Option<&str>) -> Result<TrashedItem> {
-    match expect_trash_item(filename, id)? {
+pub fn expect_single_trash_item(
+    filename: &str,
+    id: Option<&str>,
+    config: &Config,
+) -> Result<TrashedItem> {
+    match expect_trash_item(filename, id, config)? {
         FoundTrashItems::Single(item) => Ok(item),
         FoundTrashItems::Multi(candidates) => bail!(
             "Multiple items with this filename were found in the trash:\n\n{}",

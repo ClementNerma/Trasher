@@ -31,20 +31,24 @@ fn main() -> ExitCode {
 }
 
 fn inner_main() -> Result<()> {
-    let Opts { verbose, action } = Opts::parse();
+    let Opts {
+        verbose,
+        action,
+        config,
+    } = Opts::parse();
 
     if verbose {
         PRINT_DEBUG_MESSAGES.store(true, Ordering::SeqCst);
     }
 
     match action {
-        Action::List(args) => actions::list(args)?,
-        Action::Remove(args) => actions::remove(args)?,
-        Action::Drop(args) => actions::drop(args)?,
-        Action::PathOf(args) => actions::path_of(args)?,
-        Action::Restore(args) => actions::restore(args)?,
-        Action::Empty => actions::empty()?,
-        Action::TrashPath => actions::trash_path()?,
+        Action::List(args) => actions::list(args, &config)?,
+        Action::Remove(args) => actions::remove(args, &config)?,
+        Action::Drop(args) => actions::drop(args, &config)?,
+        Action::PathOf(args) => actions::path_of(args, &config)?,
+        Action::Restore(args) => actions::restore(args, &config)?,
+        Action::Empty => actions::empty(&config)?,
+        Action::TrashPath => actions::trash_path(&config)?,
     }
 
     Ok(())
