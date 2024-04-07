@@ -39,7 +39,7 @@ pub fn determine_trash_dir_for(item: &Path, config: &Config) -> Result<PathBuf> 
 /// Determine the (canonicalized) path to the mountpoint the provided path is on
 pub fn determine_mountpoint_for(item: &Path, config: &Config) -> Result<Option<PathBuf>> {
     let item = fs::canonicalize(item)
-        .with_context(|| format!("Failed to canonicalize item path: {}", item.display()))?;
+        .with_context(|| format!("Failed to canonicalize item path: {}\n\nTip: you can exclude this directory using --exclude.", item.display()))?;
 
     let exclude = config
         .exclude
