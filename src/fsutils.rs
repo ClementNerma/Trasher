@@ -24,6 +24,19 @@ const TRASH_DIR_NAME: &str = ".trasher";
 /// Name of the transfer directory in the trash
 pub const TRASH_TRANSFER_DIRNAME: &str = ".#PARTIAL";
 
+/// Directories to never create a trash directory for
+pub static ALWAYS_EXCLUDE_DIRS: &[&str] = &[
+    "/bin",
+    "/boot",
+    "/dev",
+    "/lost+found",
+    "/usr",
+    "/proc",
+    "/sbin",
+    "/snap",
+    "/sys",
+];
+
 /// Determine path to the trash directory for a given item and create it if required
 pub fn determine_trash_dir_for(item: &Path, config: &Config) -> Result<PathBuf> {
     debug!("Determining trasher directory for item: {}", item.display());
@@ -41,7 +54,7 @@ pub fn determine_mountpoint_for(item: &Path, config: &Config) -> Result<Option<P
     let item = fs::canonicalize(item)
         .with_context(|| format!("Failed to canonicalize item path: {}\n\nTip: you can exclude this directory using --exclude.", item.display()))?;
 
-    let exclude = config
+    let mut exclude = config
         .exclude
         .iter()
         .filter_map(|dir| {
@@ -57,6 +70,14 @@ pub fn determine_mountpoint_for(item: &Path, config: &Config) -> Result<Option<P
             }
         })
         .collect::<Result<Vec<_>, _>>()?;
+
+    // Add some directories to always exclude
+    exclude.extend(
+        ALWAYS_EXCLUDE_DIRS
+            .iter()
+            .map(Path::new)
+            .map(Path::to_owned),
+    );
 
     let mountpoints = mountpaths().context("Failed to list system mountpoints")?;
 
