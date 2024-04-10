@@ -286,17 +286,15 @@ pub fn restore_with_ui(config: &Config) -> Result<()> {
 }
 
 pub fn empty(config: &Config) -> Result<()> {
-    let current_dir =
-        std::env::current_dir().context("Failed to determine path to the current directory")?;
+    let trash_dirs = list_trash_dirs(config)?;
 
-    let trash_dir = determine_trash_dir_for(&current_dir, config)?;
+    println!("You are about to delete the entire directories of:\n");
 
-    println!(
-        "You are about to delete the entire directory of {}",
-        trash_dir.display()
-    );
+    for trash_dir in &trash_dirs {
+        println!("  {}", trash_dir.display());
+    }
 
-    println!("Are you sure you want to continue? If so, type 'Y' or 'y' then <Return> / <Enter>");
+    println!("\nAre you sure you want to continue? If so, type 'Y' or 'y' then <Return> / <Enter>");
 
     let mut confirm_str = String::new();
 
@@ -311,15 +309,24 @@ pub fn empty(config: &Config) -> Result<()> {
 
     println!("Emptying the trash...");
 
-    fs::remove_dir_all(&trash_dir)
-        .with_context(|| format!("Failed to empty the trash at path: {}", trash_dir.display()))?;
+    let mut failed = false;
 
-    fs::create_dir_all(&trash_dir).with_context(|| {
-        format!(
-            "Failed to re-create trash directory at path: {}",
-            trash_dir.display()
-        )
-    })?;
+    for trash_dir in trash_dirs {
+        println!("Emptying trash directory: {}", trash_dir.display());
+
+        if let Err(err) = fs::remove_dir_all(&trash_dir) {
+            println!(
+                "Failed to empty the trash at path: {}\n\n{err}",
+                trash_dir.display()
+            );
+
+            failed = true;
+        }
+    }
+
+    if failed {
+        bail!("Failed to empty trash directories");
+    }
 
     println!("Trash was successfully emptied.");
 
