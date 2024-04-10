@@ -163,7 +163,15 @@ pub fn drop(action: DropItem, config: &Config) -> Result<()> {
 
     debug!("Permanently removing item from trash...");
 
-    fs::remove_dir_all(item.complete_trash_item_path()).with_context(|| {
+    let path = item.complete_trash_item_path();
+
+    let result = if path.is_dir() {
+        fs::remove_dir_all(path)
+    } else {
+        fs::remove_file(path)
+    };
+
+    result.with_context(|| {
         format!(
             "Failed to remove item '{}' from trash",
             item.data.filename()
