@@ -51,9 +51,6 @@ pub fn determine_trash_dir_for(item: &Path, config: &Config) -> Result<PathBuf> 
 
 /// Determine the (canonicalized) path to the mountpoint the provided path is on
 pub fn determine_mountpoint_for(item: &Path, config: &Config) -> Result<Option<PathBuf>> {
-    let item = fs::canonicalize(item)
-        .with_context(|| format!("Failed to canonicalize item path: {}\n\nTip: you can exclude this directory using --exclude.", item.display()))?;
-
     let mut exclude = config
         .exclude
         .iter()
@@ -78,6 +75,15 @@ pub fn determine_mountpoint_for(item: &Path, config: &Config) -> Result<Option<P
             .map(Path::new)
             .map(Path::to_owned),
     );
+
+    // Don't canonicalize excluded item paths
+    // NOTE: Only works if item path is absolute
+    if exclude.iter().any(|dir| item.starts_with(dir)) {
+        return Ok(None);
+    }
+
+    let item = fs::canonicalize(item)
+        .with_context(|| format!("Failed to canonicalize item path: {}\n\nTip: you can exclude this directory using --exclude.", item.display()))?;
 
     let mountpoints = mountpaths().context("Failed to list system mountpoints")?;
 
