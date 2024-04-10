@@ -140,9 +140,9 @@ pub fn list_trash_dirs(config: &Config) -> Result<BTreeSet<PathBuf>> {
         .iter()
         .chain([canon_root].iter())
         .map(|path| determine_trash_dir_for(path, config))
-        .collect::<Result<BTreeSet<_>, _>>()?;
+        .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(trash_dirs)
+    Ok(trash_dirs.into_iter().filter(|dir| dir.is_dir()).collect())
 }
 
 /// List and parse all items in the trash

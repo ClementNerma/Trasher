@@ -287,14 +287,22 @@ pub fn restore_with_ui(config: &Config) -> Result<()> {
 
 pub fn empty(config: &Config) -> Result<()> {
     let trash_dirs = list_trash_dirs(config)?;
+    let items = list_all_trash_items(config)?;
 
-    println!("You are about to delete the entire directories of:\n");
+    println!("You are about to delete the entire trash directories of:\n");
 
     for trash_dir in &trash_dirs {
-        println!("  {}", trash_dir.display());
+        println!(
+            "  {} ({} items)",
+            trash_dir.display(),
+            items
+                .iter()
+                .filter(|item| &item.trash_dir == trash_dir)
+                .count()
+        );
     }
 
-    println!("\nAre you sure you want to continue? If so, type 'Y' or 'y' then <Return> / <Enter>");
+    println!("\nAre you sure you want to continue [Y/N]?");
 
     let mut confirm_str = String::new();
 
