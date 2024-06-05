@@ -87,6 +87,8 @@ pub fn determine_mountpoint_for(item: &Path, config: &Config) -> Result<Option<P
 
     let mountpoints = mountpaths().context("Failed to list system mountpoints")?;
 
+    let mut found = None::<PathBuf>;
+
     for mountpoint in &mountpoints {
         if mountpoint.to_str() == Some("/") {
             continue;
@@ -125,10 +127,13 @@ pub fn determine_mountpoint_for(item: &Path, config: &Config) -> Result<Option<P
             return Ok(None);
         }
 
-        return Ok(Some(canon_mountpoint));
+        if found.is_none() || matches!(found, Some(ref prev) if canon_mountpoint.starts_with(prev))
+        {
+            found = Some(canon_mountpoint);
+        }
     }
 
-    Ok(None)
+    Ok(found)
 }
 
 /// List all trash directories
