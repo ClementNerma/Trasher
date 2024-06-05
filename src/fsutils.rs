@@ -14,7 +14,7 @@ use fs_extra::dir::TransitProcessResult;
 use indicatif::{ProgressBar, ProgressStyle};
 use mountpoints::mountpaths;
 
-use crate::{debug, Config};
+use crate::{debug, error, Config};
 
 use super::items::TrashItemInfos;
 
@@ -164,7 +164,7 @@ pub fn list_trash_items(trash_dir: &Path) -> Result<Vec<TrashedItem>> {
         .into_iter()
         .filter_map(|item| {
             match item.file_name().into_string() {
-                Err(_) => eprintln!(
+                Err(_) => error!(
                     "WARN: Trash item '{}' does not have a valid UTF-8 filename!",
                     item.path().display()
                 ),
@@ -176,7 +176,7 @@ pub fn list_trash_items(trash_dir: &Path) -> Result<Vec<TrashedItem>> {
 
                     match TrashItemInfos::decode(&filename) {
                         Err(err) => {
-                            eprintln!(
+                            error!(
                                 "WARN: Trash item '{}' does not have a valid trash filename!",
                                 item.path().display()
                             );

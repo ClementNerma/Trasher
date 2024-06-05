@@ -2,7 +2,7 @@ use std::{fs, io::stdin, path::PathBuf};
 
 use anyhow::{Context, Result};
 
-use crate::fuzzy::FuzzyFinderItem;
+use crate::{error, fuzzy::FuzzyFinderItem, info, success, warn};
 
 use super::{args::*, bail, debug, fsutils::*, items::*};
 
@@ -14,7 +14,7 @@ pub fn list(action: ListTrashItems, config: &Config) -> Result<()> {
     let mut items = list_all_trash_items(config)?;
 
     if items.is_empty() {
-        println!("All trashes are empty.");
+        info!("All trashes are empty.");
         return Ok(());
     }
 
@@ -23,7 +23,7 @@ pub fn list(action: ListTrashItems, config: &Config) -> Result<()> {
         items.retain(|trashed| trashed.data.filename().contains(name));
 
         if items.is_empty() {
-            println!("No item in trash match the provided name.");
+            info!("No item in trash match the provided name.");
             return Ok(());
         }
     }
@@ -125,7 +125,7 @@ pub fn remove(action: MoveToTrash, config: &Config) -> Result<()> {
         }
 
         if !are_on_same_fs(&path, &trash_dir)? {
-            println!("Moving item to trash directory {}", trash_dir.display());
+            info!("Moving item to trash directory {}", trash_dir.display());
 
             let transfer_path = trash_transfer_dir.join(data.trash_filename());
 
@@ -246,7 +246,7 @@ pub fn restore(action: RestoreItem, config: &Config) -> Result<()> {
 
         fs::rename(item_path, &target_path).context("Rename operation failed")
     } else {
-        println!("Moving file across filesystems...");
+        info!("Moving file across filesystems...");
 
         move_item_pbr(&item_path, &target_path)
     };
@@ -263,7 +263,7 @@ pub fn restore_with_ui(config: &Config) -> Result<()> {
     let items = list_all_trash_items(config)?;
 
     if items.is_empty() {
-        println!("Trash is empty");
+        info!("Trash is empty");
         return Ok(());
     }
 
@@ -297,10 +297,10 @@ pub fn empty(config: &Config) -> Result<()> {
     let trash_dirs = list_trash_dirs(config)?;
     let items = list_all_trash_items(config)?;
 
-    println!("You are about to delete the entire trash directories of:\n");
+    warn!("You are about to delete the entire trash directories of:\n");
 
     for trash_dir in &trash_dirs {
-        println!(
+        warn!(
             "  {} ({} items)",
             trash_dir.display(),
             items
@@ -310,7 +310,7 @@ pub fn empty(config: &Config) -> Result<()> {
         );
     }
 
-    println!("\nAre you sure you want to continue [Y/N]?");
+    warn!("\nAre you sure you want to continue [Y/N]?");
 
     let mut confirm_str = String::new();
 
@@ -319,20 +319,20 @@ pub fn empty(config: &Config) -> Result<()> {
         .context("Failed to get user confirmation")?;
 
     if confirm_str.trim().to_ascii_lowercase() != "y" {
-        println!("Cancelled.");
+        warn!("Cancelled.");
         return Ok(());
     }
 
-    println!("Emptying the trash...");
+    info!("Emptying the trash...");
 
     let mut failed = false;
 
     for trash_dir in trash_dirs {
-        println!("Emptying trash directory: {}", trash_dir.display());
+        info!("Emptying trash directory: {}", trash_dir.display());
 
         if let Err(err) = fs::remove_dir_all(&trash_dir) {
-            println!(
-                "Failed to empty the trash at path: {}\n\n{err}",
+            error!(
+                "Failed to empty the trash at path: {}\n> {err}\n",
                 trash_dir.display()
             );
 
@@ -344,7 +344,7 @@ pub fn empty(config: &Config) -> Result<()> {
         bail!("Failed to empty trash directories");
     }
 
-    println!("Trash was successfully emptied.");
+    success!("Trash was successfully emptied.");
 
     Ok(())
 }

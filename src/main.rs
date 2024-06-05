@@ -7,6 +7,7 @@
 
 mod actions;
 mod args;
+mod display;
 mod fsutils;
 mod fuzzy;
 mod items;
@@ -24,7 +25,7 @@ fn main() -> ExitCode {
     match inner_main() {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
-            eprintln!("\x1B[91mERROR: {err:?}\x1B[0m");
+            error!("ERROR: {err:?}");
             ExitCode::FAILURE
         }
     }
@@ -58,5 +59,11 @@ pub static PRINT_DEBUG_MESSAGES: AtomicBool = AtomicBool::new(false);
 
 #[macro_export]
 macro_rules! debug {
-    ($message: expr$(,$params: expr)*) => { if $crate::PRINT_DEBUG_MESSAGES.load(::std::sync::atomic::Ordering::SeqCst) { println!(concat!("[DEBUG] ", $message), $($params,)*); } }
+    ($message: expr$(,$params: expr)*) => {{
+        use ::std::sync::atomic::Ordering;
+
+        if $crate::PRINT_DEBUG_MESSAGES.load(Ordering::SeqCst) {
+            println!(concat!("[DEBUG] ", $message), $($params,)*);
+        }
+    }}
 }
