@@ -30,11 +30,12 @@ pub static ALWAYS_EXCLUDE_DIRS: &[&str] = &[
     "/boot",
     "/dev",
     "/lost+found",
-    "/usr",
     "/proc",
+    "/run",
     "/sbin",
     "/snap",
     "/sys",
+    "/usr",
     "/var/lib/docker",
 ];
 
