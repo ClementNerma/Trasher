@@ -41,16 +41,8 @@ pub static ALWAYS_EXCLUDE_DIRS: &[&str] = &[
 pub fn determine_trash_dir_for(item: &Path, config: &Config) -> Result<PathBuf> {
     debug!("Determining trasher directory for item: {}", item.display());
 
-    let parent_dir = match determine_mountpoint_for(item, config)? {
-        Some(path) => path,
-        None => dirs::home_dir().context("Failed to determine path to user's home directory")?,
-    };
+    let home_dir = dirs::home_dir().context("Failed to determine path to user's home directory")?;
 
-    Ok(parent_dir.join(TRASH_DIR_NAME))
-}
-
-/// Determine the (canonicalized) path to the mountpoint the provided path is on
-pub fn determine_mountpoint_for(item: &Path, config: &Config) -> Result<Option<PathBuf>> {
     let mut exclude = config
         .exclude
         .iter()
@@ -79,13 +71,18 @@ pub fn determine_mountpoint_for(item: &Path, config: &Config) -> Result<Option<P
     // Don't canonicalize excluded item paths
     // NOTE: Only works if item path is absolute
     if exclude.iter().any(|dir| item.starts_with(dir)) {
-        return Ok(None);
+        return Ok(home_dir.join(TRASH_DIR_NAME));
     }
 
     let item = fs::canonicalize(item)
         .with_context(|| format!("Failed to canonicalize item path: {}\n\nTip: you can exclude this directory using --exclude.", item.display()))?;
 
-    let mountpoints = mountpaths().context("Failed to list system mountpoints")?;
+    let mut mountpoints = mountpaths().context("Failed to list system mountpoints")?;
+
+    // Add home directory for specialization
+    // e.g. if "/home" is a mounted directory, and we delete an item instead "/home/$USER",
+    // this line will allow the algorithm to pick the more specialized "/home/$USER" instead
+    mountpoints.push(home_dir.clone());
 
     let mut found = None::<PathBuf>;
 
@@ -124,7 +121,8 @@ pub fn determine_mountpoint_for(item: &Path, config: &Config) -> Result<Option<P
         }
 
         if exclude.iter().any(|parent| item.starts_with(parent)) {
-            return Ok(None);
+            found = None;
+            break;
         }
 
         if found.is_none() || matches!(found, Some(ref prev) if canon_mountpoint.starts_with(prev))
@@ -133,7 +131,7 @@ pub fn determine_mountpoint_for(item: &Path, config: &Config) -> Result<Option<P
         }
     }
 
-    Ok(found)
+    Ok(found.unwrap_or(home_dir).join(TRASH_DIR_NAME))
 }
 
 /// List all trash directories
