@@ -35,6 +35,7 @@ pub static ALWAYS_EXCLUDE_DIRS: &[&str] = &[
     "/sbin",
     "/snap",
     "/sys",
+    "/var/lib/docker",
 ];
 
 /// Determine path to the trash directory for a given item and create it if required
