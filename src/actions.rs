@@ -1,8 +1,9 @@
 use std::{fs, io::stdin, path::PathBuf};
 
 use anyhow::{Context, Result};
+use indicatif::{ProgressBar, ProgressStyle};
 
-use crate::{error, fuzzy::FuzzyFinderItem, info, success, warn};
+use crate::{fuzzy::FuzzyFinderItem, info, success, warn};
 
 use super::{args::*, bail, debug, fsutils::*, items::*};
 
@@ -330,23 +331,42 @@ pub fn empty(config: &Config) -> Result<()> {
 
     info!("Emptying the trash...");
 
-    let mut failed = false;
-
     for trash_dir in trash_dirs {
         info!("Emptying trash directory: {}", trash_dir.display());
 
-        if let Err(err) = fs::remove_dir_all(&trash_dir) {
-            error!(
-                "Failed to empty the trash at path: {}\n> {err}\n",
-                trash_dir.display()
-            );
+        warn!("> Listing files and directories to delete...");
 
-            failed = true;
+        let items = list_deletable_fs_items(&trash_dir)?;
+
+        warn!("> Deleting all {} items...", items.len());
+
+        let pbr = ProgressBar::new(items.len().try_into().unwrap());
+
+        pbr.set_style(ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+            .expect("Invalid progress bar template")
+            .progress_chars("#>-"));
+
+        for (i, item) in items.iter().enumerate() {
+            let metadata = item
+                .symlink_metadata()
+                .with_context(|| format!("Failed to get metadata for item: {}", item.display()))?
+                .file_type();
+
+            if metadata.is_dir() {
+                fs::remove_dir(item)
+                    .with_context(|| format!("Failed to remove directory: {}", item.display()))?;
+            } else {
+                fs::remove_file(item)
+                    .with_context(|| format!("Failed to remove file: {}", item.display()))?;
+            }
+
+            if i % 25 == 0 || i + 1 == items.len() {
+                pbr.set_position((i + 1).try_into().unwrap());
+            }
         }
-    }
 
-    if failed {
-        bail!("Failed to empty trash directories");
+        pbr.finish();
     }
 
     success!("Trash was successfully emptied.");

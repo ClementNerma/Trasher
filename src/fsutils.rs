@@ -13,6 +13,7 @@ use comfy_table::{presets::UTF8_FULL_CONDENSED, ContentArrangement, Table};
 use fs_extra::dir::TransitProcessResult;
 use indicatif::{ProgressBar, ProgressStyle};
 use mountpoints::mountpaths;
+use walkdir::WalkDir;
 
 use crate::{debug, error, Config};
 
@@ -464,4 +465,13 @@ pub fn are_on_same_fs(a: &Path, b: &Path) -> Result<bool> {
         .with_context(|| format!("Failed to get filesystem ID for item '{}'", b.display()))?;
 
     Ok(a_fs_id == b_fs_id)
+}
+
+pub fn list_deletable_fs_items(path: &Path) -> Result<Vec<PathBuf>> {
+    WalkDir::new(path)
+        .contents_first(true)
+        .into_iter()
+        .map(|entry| entry.map(|entry| entry.into_path()))
+        .collect::<Result<Vec<PathBuf>, _>>()
+        .context("Failed to read directory entry")
 }
