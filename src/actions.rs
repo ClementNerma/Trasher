@@ -297,6 +297,11 @@ pub fn empty(config: &Config) -> Result<()> {
     let trash_dirs = list_trash_dirs(config)?;
     let items = list_all_trash_items(config)?;
 
+    if items.is_empty() {
+        info!("Trash is empty");
+        return Ok(());
+    }
+
     warn!("You are about to delete the entire trash directories of:\n");
 
     for trash_dir in &trash_dirs {
