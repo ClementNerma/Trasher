@@ -1,124 +1,67 @@
-use std::{fmt, path::PathBuf, str};
+use std::{
+    str,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use chrono::{prelude::*, LocalResult};
-use crc_any::CRC;
-use once_cell::sync::Lazy;
-use regex::Regex;
 
-static DECODER: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(
-        "^(?P<filename>.*)\\s\\[@\\s(?P<datetime>.*)\\]\\s\\{(?P<id>[\\da-zA-Z_\\-]+)\\}(\\.[^\\.]*)?$"
-    ).unwrap()
-});
-
-static DATETIME_FORMAT: &str = "%Y.%m.%d_%Hh%Mm%Ss.%f%z";
+static NAME_ID_SEPARATOR: &str = " ^";
 
 #[derive(Debug, Clone)]
 pub struct TrashItemInfos {
-    pub id: String,
     pub filename: String,
-    pub datetime: DateTime<Local>,
+    pub datetime: SystemTime,
 }
 
 impl TrashItemInfos {
-    pub fn new(filename: String, datetime: DateTime<Local>) -> Self {
-        Self {
-            id: Self::hash(datetime),
-            filename,
-            datetime,
-        }
+    pub fn new(filename: String, datetime: SystemTime) -> Self {
+        Self { filename, datetime }
     }
 
     pub fn new_now(filename: String) -> Self {
-        Self::new(filename, Local::now())
+        Self::new(filename, SystemTime::now())
     }
 
-    pub fn hash(datetime: DateTime<Local>) -> String {
-        let mut crc24 = CRC::crc24();
-        crc24.digest(&datetime.timestamp().to_le_bytes());
-        crc24.digest(&datetime.timestamp_subsec_nanos().to_le_bytes());
-        URL_SAFE_NO_PAD.encode(crc24.get_crc_vec_le())
-    }
-
-    pub fn id(&self) -> &str {
-        &self.id
-    }
-
-    pub fn filename(&self) -> &str {
-        &self.filename
-    }
-
-    pub fn datetime(&self) -> &DateTime<Local> {
-        &self.datetime
+    pub fn compute_id(&self) -> String {
+        URL_SAFE_NO_PAD.encode(
+            self.datetime
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                .to_le_bytes(),
+        )
     }
 
     pub fn trash_filename(&self) -> String {
-        let extension = match PathBuf::from(&self.filename).extension() {
-            // There cannot be any loss here as the provided filename is a valid UTF-8 string
-            Some(ext) => format!(".{}", ext.to_string_lossy()),
-            None => "".to_string(),
-        };
-
-        format!(
-            "{} [@ {}] {{{}}}{}",
-            self.filename,
-            self.datetime.format(DATETIME_FORMAT),
-            self.id,
-            extension
-        )
+        format!("{}{NAME_ID_SEPARATOR}{}", self.filename, self.compute_id())
     }
 
-    pub fn decode(final_name: &str) -> Result<TrashItemInfos, TrashItemDecodingError> {
-        let captured = DECODER
-            .captures(final_name)
+    pub fn decode(trash_filename: &str) -> Result<TrashItemInfos, TrashItemDecodingError> {
+        let circumflex_pos = trash_filename
+            .rfind(NAME_ID_SEPARATOR)
             .ok_or(TrashItemDecodingError::InvalidFilenameFormat)?;
 
-        let datetime = DateTime::parse_from_str(&captured["datetime"], DATETIME_FORMAT)
-            .map_err(TrashItemDecodingError::InvalidDateTime)?;
+        let id = URL_SAFE_NO_PAD
+            .decode(&trash_filename[circumflex_pos + NAME_ID_SEPARATOR.len()..])
+            .map_err(|_| TrashItemDecodingError::BadlyEncodedId)?;
 
-        let timezoned = match Local.from_local_datetime(&datetime.naive_local()) {
-            LocalResult::None => return Err(TrashItemDecodingError::TimezoneDecodingError),
-            LocalResult::Single(datetime) => datetime,
-            LocalResult::Ambiguous(_, _) => {
-                return Err(TrashItemDecodingError::TimezoneDecodingError)
-            }
-        };
+        let id = u64::from_le_bytes(
+            id.try_into()
+                .map_err(|_| TrashItemDecodingError::InvalidIdLength)?,
+        );
 
-        let decoded = Self::new(captured["filename"].to_string(), timezoned);
+        let datetime = UNIX_EPOCH + Duration::from_secs(id);
 
-        if decoded.id != captured["id"] {
-            Err(TrashItemDecodingError::IdDoesNotMatch {
-                found: captured["id"].to_string(),
-                expected: decoded.id,
-            })
-        } else {
-            Ok(decoded)
-        }
+        Ok(Self::new(
+            trash_filename[0..circumflex_pos].to_owned(),
+            datetime,
+        ))
     }
 }
 
+#[derive(Debug)]
 pub enum TrashItemDecodingError {
     InvalidFilenameFormat,
-    InvalidDateTime(chrono::ParseError),
-    TimezoneDecodingError,
-    IdDoesNotMatch { found: String, expected: String },
-}
-
-impl fmt::Debug for TrashItemDecodingError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::InvalidFilenameFormat => "File name format is invalid".to_string(),
-                Self::InvalidDateTime(err) =>
-                    format!("Invalid date/time in file name: {:?}", err.to_string()),
-                Self::TimezoneDecodingError =>
-                    "Date/time is invalid for the local timezone".to_string(),
-                Self::IdDoesNotMatch { found, expected } =>
-                    format!("Found ID '{}' but expected one was '{}'", found, expected),
-            }
-        )
-    }
+    BadlyEncodedId,
+    InvalidIdLength,
 }

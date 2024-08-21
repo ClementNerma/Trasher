@@ -12,6 +12,7 @@ use anyhow::{bail, Context, Result};
 use comfy_table::{presets::UTF8_FULL_CONDENSED, ContentArrangement, Table};
 use fs_extra::dir::TransitProcessResult;
 use indicatif::{ProgressBar, ProgressStyle};
+use jiff::Zoned;
 use mountpoints::mountpaths;
 use walkdir::WalkDir;
 
@@ -210,8 +211,7 @@ pub fn list_all_trash_items(config: &Config) -> Result<Vec<TrashedItem>> {
         .collect::<Result<Vec<_>, _>>()?;
 
     let mut items = all_trash_items.into_iter().flatten().collect::<Vec<_>>();
-
-    items.sort_by(|a, b| a.data.datetime().cmp(b.data.datetime()));
+    items.sort_by_key(|item| item.data.datetime);
 
     Ok(items)
 }
@@ -224,7 +224,7 @@ pub fn expect_trash_item(
 ) -> Result<FoundTrashItems> {
     let mut candidates = list_all_trash_items(config)?
         .into_iter()
-        .filter(|trashed| trashed.data.filename() == filename)
+        .filter(|trashed| trashed.data.filename == filename)
         .collect::<Vec<_>>();
 
     if candidates.is_empty() {
@@ -235,7 +235,7 @@ pub fn expect_trash_item(
             Some(id) => Ok(FoundTrashItems::Single(
                 candidates
                     .into_iter()
-                    .find(|c| c.data.id() == id)
+                    .find(|c| c.data.compute_id() == id)
                     .context("There is no trash item with the provided ID")?,
             )),
         }
@@ -403,11 +403,7 @@ pub fn table_for_items(items: &[TrashedItem]) -> Table {
     for item in items {
         let TrashedItem { data, trash_dir } = item;
 
-        let TrashItemInfos {
-            id,
-            filename,
-            datetime,
-        } = data;
+        let TrashItemInfos { filename, datetime } = data;
 
         let mt = fs::metadata(item.complete_trash_item_path());
 
@@ -415,23 +411,25 @@ pub fn table_for_items(items: &[TrashedItem]) -> Table {
             match &mt {
                 Ok(mt) => {
                     if mt.file_type().is_file() {
-                        "File"
+                        "File".to_owned()
                     } else if mt.file_type().is_dir() {
-                        "Directory"
+                        "Directory".to_owned()
                     } else {
-                        "<Unknown>"
+                        "<Unknown>".to_owned()
                     }
                 }
-                Err(_) => "ERROR",
-            }
-            .to_string(),
+
+                Err(err) => format!("ERROR: {err}"),
+            },
             filename.clone(),
             match &mt {
                 Ok(mt) => human_readable_size(mt.len()),
                 Err(_) => "ERROR".to_owned(),
             },
-            id.clone(),
-            datetime.to_rfc2822(),
+            data.compute_id(),
+            Zoned::try_from(*datetime)
+                .and_then(|date| jiff::fmt::rfc2822::to_string(&date))
+                .unwrap_or_else(|_| "<Failed to format date>".to_owned()),
             trash_dir.to_string_lossy().into_owned(),
         ]);
     }

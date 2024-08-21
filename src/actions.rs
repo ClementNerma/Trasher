@@ -2,6 +2,7 @@ use std::{fs, io::stdin, path::PathBuf};
 
 use anyhow::{Context, Result};
 use indicatif::{ProgressBar, ProgressStyle};
+use jiff::Zoned;
 
 use crate::{fuzzy::FuzzyFinderItem, info, success, warn};
 
@@ -21,7 +22,7 @@ pub fn list(action: ListTrashItems, config: &Config) -> Result<()> {
 
     if let Some(name) = &name {
         debug!("Filtering {} items by name...", items.len());
-        items.retain(|trashed| trashed.data.filename().contains(name));
+        items.retain(|trashed| trashed.data.filename.contains(name));
 
         if items.is_empty() {
             info!("No item in trash match the provided name.");
@@ -172,12 +173,7 @@ pub fn drop(action: DropItem, config: &Config) -> Result<()> {
         fs::remove_file(path)
     };
 
-    result.with_context(|| {
-        format!(
-            "Failed to remove item '{}' from trash",
-            item.data.filename()
-        )
-    })
+    result.with_context(|| format!("Failed to remove item '{}' from trash", item.data.filename))
 }
 
 pub fn path_of(action: GetItemPath, config: &Config) -> Result<()> {
@@ -227,7 +223,7 @@ pub fn restore(action: RestoreItem, config: &Config) -> Result<()> {
         None => std::env::current_dir()?,
     };
 
-    let target_path = target_path.join(item.data.filename());
+    let target_path = target_path.join(&item.data.filename);
 
     if target_path.exists() {
         bail!("Target path already exists.");
@@ -252,12 +248,7 @@ pub fn restore(action: RestoreItem, config: &Config) -> Result<()> {
         move_item_pbr(&item_path, &target_path)
     };
 
-    result.with_context(|| {
-        format!(
-            "Failed to restore item '{}' from trash",
-            item.data.filename()
-        )
-    })
+    result.with_context(|| format!("Failed to restore item '{}' from trash", item.data.filename))
 }
 
 pub fn restore_with_ui(config: &Config) -> Result<()> {
@@ -274,8 +265,10 @@ pub fn restore_with_ui(config: &Config) -> Result<()> {
             .map(|item| FuzzyFinderItem {
                 display: format!(
                     "[{}] {}",
-                    item.data.datetime().to_rfc2822(),
-                    item.data.filename()
+                    Zoned::try_from(item.data.datetime)
+                        .and_then(|date| jiff::fmt::rfc2822::to_string(&date))
+                        .unwrap_or_else(|_| "<Failed to format date>".to_owned()),
+                    item.data.filename
                 ),
                 value: item,
             })
@@ -284,9 +277,9 @@ pub fn restore_with_ui(config: &Config) -> Result<()> {
 
     restore(
         RestoreItem {
-            filename: Some(to_remove.data.filename().to_owned()),
+            filename: Some(to_remove.data.filename.to_owned()),
             to: None,
-            id: Some(to_remove.data.id().to_owned()),
+            id: Some(to_remove.data.compute_id().to_owned()),
         },
         config,
     )?;
