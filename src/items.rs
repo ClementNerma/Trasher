@@ -27,7 +27,7 @@ impl TrashItemInfos {
             self.datetime
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
-                .as_secs()
+                .as_nanos()
                 .to_le_bytes(),
         )
     }
@@ -45,12 +45,14 @@ impl TrashItemInfos {
             .decode(&trash_filename[circumflex_pos + NAME_ID_SEPARATOR.len()..])
             .map_err(|_| TrashItemDecodingError::BadlyEncodedId)?;
 
-        let id = u64::from_le_bytes(
+        let id = u128::from_le_bytes(
             id.try_into()
                 .map_err(|_| TrashItemDecodingError::InvalidIdLength)?,
         );
 
-        let datetime = UNIX_EPOCH + Duration::from_secs(id);
+        let datetime = UNIX_EPOCH
+            + Duration::from_secs((id / 1_000_000_000) as u64)
+            + Duration::from_nanos((id % 1_000_000_000) as u64);
 
         Ok(Self::new(
             trash_filename[0..circumflex_pos].to_owned(),
