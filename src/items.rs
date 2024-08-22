@@ -49,6 +49,10 @@ impl TrashItemInfos {
             .decode(&trash_filename[circumflex_pos + NAME_ID_SEPARATOR.len()..])
             .map_err(|_| TrashItemDecodingError::BadlyEncodedId)?;
 
+        if id.is_empty() || id.len() > 16 {
+            return Err(TrashItemDecodingError::InvalidIdLength);
+        }
+
         let mut int_bytes = [0u8; 16];
         int_bytes[16 - id.len()..16].copy_from_slice(&id);
 
