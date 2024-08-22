@@ -1,11 +1,18 @@
 use std::{
     str,
+    sync::LazyLock,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 
 static NAME_ID_SEPARATOR: &str = " ^";
+
+static DATE_REFERENTIAL: LazyLock<SystemTime> =
+    LazyLock::new(|| 
+        // 2024 January 1st. 00:00:00 UTC
+        UNIX_EPOCH + Duration::from_secs(1704067200)
+    );
 
 #[derive(Debug, Clone)]
 pub struct TrashItemInfos {
@@ -23,13 +30,10 @@ impl TrashItemInfos {
     }
 
     pub fn compute_id(&self) -> String {
-        URL_SAFE_NO_PAD.encode(
-            self.datetime
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-                .to_le_bytes(),
-        )
+        let id_bytes = self.datetime.duration_since(*DATE_REFERENTIAL).unwrap().as_nanos().to_be_bytes();
+        let id_bytes = &id_bytes[id_bytes.iter().position(|b| *b != 0).unwrap_or(0)..];
+
+        URL_SAFE_NO_PAD.encode(id_bytes)
     }
 
     pub fn trash_filename(&self) -> String {
@@ -45,12 +49,12 @@ impl TrashItemInfos {
             .decode(&trash_filename[circumflex_pos + NAME_ID_SEPARATOR.len()..])
             .map_err(|_| TrashItemDecodingError::BadlyEncodedId)?;
 
-        let id = u128::from_le_bytes(
-            id.try_into()
-                .map_err(|_| TrashItemDecodingError::InvalidIdLength)?,
-        );
+        let mut int_bytes = [0u8; 16];
+        int_bytes[16 - id.len()..16].copy_from_slice(&id);
 
-        let datetime = UNIX_EPOCH
+        let id = u128::from_be_bytes(int_bytes);
+
+        let datetime = *DATE_REFERENTIAL
             + Duration::from_secs((id / 1_000_000_000) as u64)
             + Duration::from_nanos((id % 1_000_000_000) as u64);
 
