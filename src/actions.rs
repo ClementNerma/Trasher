@@ -336,7 +336,7 @@ pub fn empty(config: &Config) -> Result<()> {
         let pbr = ProgressBar::new(items.len().try_into().unwrap());
 
         pbr.set_style(ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {human_pos}/{human_len} ({eta})")
             .expect("Invalid progress bar template")
             .progress_chars("#>-"));
 
