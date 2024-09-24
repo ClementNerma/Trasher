@@ -408,24 +408,28 @@ pub fn table_for_items(items: &[TrashedItem]) -> Table {
         let mt = fs::metadata(item.complete_trash_item_path());
 
         table.add_row(vec![
-            match &mt {
-                Ok(mt) => {
+            mt.as_ref()
+                .map(|mt| {
                     if mt.file_type().is_file() {
-                        "File".to_owned()
+                        "File"
                     } else if mt.file_type().is_dir() {
-                        "Directory".to_owned()
+                        "Directory"
                     } else {
-                        "<Unknown>".to_owned()
+                        "<Unknown>"
                     }
-                }
-
-                Err(err) => format!("ERROR: {err}"),
-            },
+                    .to_owned()
+                })
+                .unwrap_or_else(|err| format!("ERROR: {err}")),
             filename.clone(),
-            match &mt {
-                Ok(mt) => human_readable_size(mt.len()),
-                Err(_) => "ERROR".to_owned(),
-            },
+            mt.as_ref()
+                .map(|mt| {
+                    if mt.file_type().is_file() {
+                        human_readable_size(mt.len())
+                    } else {
+                        String::new()
+                    }
+                })
+                .unwrap_or_else(|_| "ERROR".to_owned()),
             data.compute_id(),
             Zoned::try_from(*datetime)
                 .and_then(|date| jiff::fmt::rfc2822::to_string(&date))
