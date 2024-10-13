@@ -16,18 +16,20 @@ There are several actions available:
 * `ls`: list items in the trash, use `-d / --details` to get the size and content of items
 * `rm <path>`: move an item to the trash, use `-p / --permanently` to delete the item instead of moving it to the trash
 * `unrm <name>`: restore an item in the current directory, use `--id` to provide an ID and `--to` to specify another restoration location
-* `unrm-ui`: restore an item interactively (a fuzzy finder will be displayed)
 * `drop <name>`: permanently delete an item from the trash, use `--id` to provide an ID
-* `clear`: remove all items from the trash
+* `path-of <name>`: get the path to an item inside the trash directory
+* `trash-path`: get the path to the trash directory associated to the current mountpoint (depends on the shell's current directory)
+* `empty`: remove all items from the trash
+* `help`: display informations about this tool's usage
 
 ## How does it work
 
-When an item is moved to the trash, its name is suffixed by its date of deletion and by an ID which is computed using a double CRC (see [technical details](#technical-details)).
+When an item is moved to the trash, its name is suffixed by its base64-encoded date of deletion.
 
 For instance, when deleting an item named `my-files`, it will be moved to the trash directory under a name like:
 
 ```
-my-files [@ 2020.08.03_11h36m36s.093347700+0200] {IBuc}
+my-files ^TrCxIAqzuA
 ```
 
 This allows you to open the trash directory and see its content without using the Trasher binary. Also, Trasher doesn't use an index file, it only extracts informations from the files present in the trash, so you can move it to another drive without any problem, or even merge two trash directories into a single one!
@@ -38,14 +40,20 @@ You can then then restore items from the trash by specifying their names. If mul
 
 ### External filesystems
 
-The moving is actually performed by renaming the file, which is a lot faster than moving data around and gives exactly the same result. For external filesystems, a trash directory is created at the root of the filesystem.
+The moving is actually performed by renaming the file, which is a lot faster than moving data around and gives exactly the same result. For external filesystems, a trash directory is created at the root of the filesystem. You can the use the `trash-path` subcommand to see the trash directory associated to the current folder, for instane:
+
+```
+cd ~/Downloads
+trasher trash-path # /home/<username>/.trasher*
+
+cd /mnt/somewhere/something
+trasher trash-path # probably /mnt/somehwere
+```
 
 ## Technical details
 
 Removed items' name must be UTF-8-compliant, so invalid UTF-8 filenames will make the program fail unless `-a / --allow-invalid-utf8-item-names` flag is provided during deletion, which will result in converting the filename to a valid UTF-8 string lossily.
 
-Trash item's name is composed of the original item's name, its removal date and exact time in nanoseconds with timezone, as well as an ID which is a CRC on 24 bits of the deletion date.
+Trash item's name is composed of the original item's name, its removal date and time with nanosecond precision and timezone, which is then base64-encoded and acts as a unique identifier for this file (CPU speed isn't fast enough to allow two items to be deleted at the exact same nanosecond, much less two items which would happen to have the same name).
 
-CRC has been chosen as it's extremely fast and there's extremely low risks of collision between two different dates with a CRC on 24 bits (unless an item with the same name is deleted hundreds of thousands of times).
-
-When removing an item, if multiple trash items have the same name, the ID is required _along with the name_, so the filename doesn't need to be CRC-ed and so we avoid all risks of collisions with filenames, which can have an enormous number of different values.
+When restoring an item, if multiple trash items have the same name, the ID is required to know which file to restore.
