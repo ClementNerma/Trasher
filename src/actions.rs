@@ -61,7 +61,7 @@ pub fn remove(action: MoveToTrash, config: &Config) -> Result<()> {
                 continue;
             }
 
-            bail!("Item path does not exist.");
+            bail!("No item exists at path: {}", path.display());
         }
 
         if permanently {
