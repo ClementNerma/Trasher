@@ -7,6 +7,7 @@ use crossterm::{
     ExecutableCommand,
 };
 use ratatui::{
+    layout::Position,
     prelude::{Backend, Constraint, CrosstermBackend, Direction, Layout},
     style::{Color, Style},
     widgets::{List, ListItem, ListState, Paragraph},
@@ -130,7 +131,7 @@ fn draw_ui<T: Clone>(f: &mut Frame, state: &mut State<T>) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(1), Constraint::Length(10)])
-        .split(f.size());
+        .split(f.area());
 
     // === Draw input line === //
 
@@ -145,10 +146,10 @@ fn draw_ui<T: Clone>(f: &mut Frame, state: &mut State<T>) {
 
     f.render_widget(input, chunks[0]);
 
-    f.set_cursor(
-        chunks[0].x + (state.input_widget.visual_cursor().max(scroll) - scroll) as u16,
-        chunks[0].y,
-    );
+    f.set_cursor_position(Position {
+        x: chunks[0].x + (state.input_widget.visual_cursor().max(scroll) - scroll) as u16,
+        y: chunks[0].y,
+    });
 
     // === Draw results list === //
 
