@@ -309,7 +309,7 @@ pub fn empty(config: &Config) -> Result<()> {
         );
     }
 
-    warn!("\nAre you sure you want to continue [Y/N]?");
+    warn!("\nAre you sure you want to continue [y/N]?");
 
     let mut confirm_str = String::new();
 
