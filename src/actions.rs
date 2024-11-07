@@ -317,7 +317,7 @@ pub fn empty(config: &Config) -> Result<()> {
         .read_line(&mut confirm_str)
         .context("Failed to get user confirmation")?;
 
-    if confirm_str.trim().to_ascii_lowercase() != "y" {
+    if !confirm_str.trim().eq_ignore_ascii_case("y") {
         warn!("Cancelled.");
         return Ok(());
     }
