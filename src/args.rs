@@ -1,12 +1,19 @@
 use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};
+use log::LevelFilter;
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
-pub struct Opts {
-    #[clap(global = true, short, long)]
-    pub verbose: bool,
+pub struct CmdArgs {
+    #[clap(
+        short,
+        long,
+        global = true,
+        help = "Level of verbosity",
+        default_value = "info"
+    )]
+    pub verbosity: LevelFilter,
 
     #[clap(subcommand)]
     pub action: Action,

@@ -3,10 +3,11 @@ use std::{fs, io::stdin, path::PathBuf};
 use anyhow::{Context, Result};
 use indicatif::{ProgressBar, ProgressStyle};
 use jiff::Zoned;
+use log::{debug, info, warn};
 
-use crate::{fuzzy::FuzzyFinderItem, info, success, warn};
+use crate::fuzzy::FuzzyFinderItem;
 
-use super::{args::*, bail, debug, fsutils::*, items::*};
+use super::{args::*, bail, fsutils::*, items::*};
 
 pub fn list(action: ListTrashItems, config: &Config) -> Result<()> {
     let ListTrashItems { name } = action;
@@ -362,7 +363,7 @@ pub fn empty(config: &Config) -> Result<()> {
         pbr.finish();
     }
 
-    success!("Trash was successfully emptied.");
+    info!("Trash was successfully emptied.");
 
     Ok(())
 }

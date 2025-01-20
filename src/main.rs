@@ -7,23 +7,33 @@
 
 mod actions;
 mod args;
-mod display;
 mod fsutils;
 mod fuzzy;
 mod items;
+mod logger;
 
-use std::{
-    process::ExitCode,
-    sync::atomic::{AtomicBool, Ordering},
-};
+use std::process::ExitCode;
 
 use anyhow::{bail, Result};
 use args::*;
 use clap::Parser;
+use log::error;
+
+use self::logger::Logger;
 
 fn main() -> ExitCode {
-    match inner_main() {
+    let CmdArgs {
+        verbosity,
+        action,
+        config,
+    } = CmdArgs::parse();
+
+    // Set up the logger
+    Logger::new(verbosity).init().unwrap();
+
+    match inner_main(action, config) {
         Ok(()) => ExitCode::SUCCESS,
+
         Err(err) => {
             error!("ERROR: {err:?}");
             ExitCode::FAILURE
@@ -31,17 +41,7 @@ fn main() -> ExitCode {
     }
 }
 
-fn inner_main() -> Result<()> {
-    let Opts {
-        verbose,
-        action,
-        config,
-    } = Opts::parse();
-
-    if verbose {
-        PRINT_DEBUG_MESSAGES.store(true, Ordering::SeqCst);
-    }
-
+fn inner_main(action: Action, config: Config) -> Result<()> {
     match action {
         Action::List(args) => actions::list(args, &config)?,
         Action::Remove(args) => actions::remove(args, &config)?,
@@ -53,17 +53,4 @@ fn inner_main() -> Result<()> {
     }
 
     Ok(())
-}
-
-pub static PRINT_DEBUG_MESSAGES: AtomicBool = AtomicBool::new(false);
-
-#[macro_export]
-macro_rules! debug {
-    ($message: expr$(,$params: expr)*) => {{
-        use ::std::sync::atomic::Ordering;
-
-        if $crate::PRINT_DEBUG_MESSAGES.load(Ordering::SeqCst) {
-            println!(concat!("[DEBUG] ", $message), $($params,)*);
-        }
-    }}
 }

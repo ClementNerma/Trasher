@@ -13,10 +13,11 @@ use comfy_table::{presets::UTF8_FULL_CONDENSED, ContentArrangement, Table};
 use fs_extra::dir::TransitProcessResult;
 use indicatif::{ProgressBar, ProgressStyle};
 use jiff::Zoned;
+use log::{debug, error, warn};
 use mountpoints::mountpaths;
 use walkdir::WalkDir;
 
-use crate::{debug, error, warn, Config};
+use crate::Config;
 
 use super::items::TrashItemInfos;
 
@@ -148,6 +149,7 @@ pub fn list_trash_dirs(config: &Config) -> Result<BTreeSet<PathBuf>> {
         .chain([canon_root].iter())
         .filter(|path| match fs::metadata(path) {
             Ok(_) => true,
+
             Err(err) => {
                 warn!("Warning: Skipping mountpoint {}: {err}", path.display());
                 false
@@ -190,7 +192,7 @@ pub fn list_trash_items(trash_dir: &Path) -> Result<Vec<TrashedItem>> {
                                 item.path().display()
                             );
 
-                            super::debug!("Invalid trash item filename: {:?}", err);
+                            debug!("Invalid trash item filename: {:?}", err);
                         }
 
                         Ok(item) => {
