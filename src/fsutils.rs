@@ -16,7 +16,7 @@ use jiff::Zoned;
 use mountpoints::mountpaths;
 use walkdir::WalkDir;
 
-use crate::{debug, error, Config};
+use crate::{debug, error, warn, Config};
 
 use super::items::TrashItemInfos;
 
@@ -146,6 +146,13 @@ pub fn list_trash_dirs(config: &Config) -> Result<BTreeSet<PathBuf>> {
         .context("Failed to list system mountpoints")?
         .iter()
         .chain([canon_root].iter())
+        .filter(|path| match fs::metadata(path) {
+            Ok(_) => true,
+            Err(err) => {
+                warn!("Warning: Skipping mountpoint {}: {err}", path.display());
+                false
+            }
+        })
         .map(|path| determine_trash_dir_for(path, config))
         .collect::<Result<Vec<_>, _>>()?;
 
