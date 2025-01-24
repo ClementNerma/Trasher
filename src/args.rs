@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 
-use clap::{Args, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 use log::LevelFilter;
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
-pub struct CmdArgs {
+pub struct Args {
     #[clap(
         short,
         long,
@@ -15,21 +15,16 @@ pub struct CmdArgs {
     )]
     pub verbosity: LevelFilter,
 
-    #[clap(subcommand)]
-    pub action: Action,
-
-    #[clap(flatten)]
-    pub config: Config,
-}
-
-#[derive(Args)]
-pub struct Config {
     #[clap(
         global = true,
+        short,
         long,
         help = "Disallow making a filesystem-local trash directory in some paths"
     )]
     pub exclude: Vec<PathBuf>,
+
+    #[clap(subcommand)]
+    pub action: Action,
 }
 
 #[derive(Subcommand)]

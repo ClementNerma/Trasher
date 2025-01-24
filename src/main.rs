@@ -12,26 +12,26 @@ mod fuzzy;
 mod items;
 mod logger;
 
-use std::process::ExitCode;
+use std::{path::PathBuf, process::ExitCode};
 
 use anyhow::{bail, Result};
 use args::*;
 use clap::Parser;
 use log::error;
 
-use self::logger::Logger;
+use self::{fsutils::compute_exclusions, logger::Logger};
 
 fn main() -> ExitCode {
-    let CmdArgs {
+    let Args {
         verbosity,
+        exclude,
         action,
-        config,
-    } = CmdArgs::parse();
+    } = Args::parse();
 
     // Set up the logger
     Logger::new(verbosity).init().unwrap();
 
-    match inner_main(action, config) {
+    match inner_main(action, &exclude) {
         Ok(()) => ExitCode::SUCCESS,
 
         Err(err) => {
@@ -41,15 +41,18 @@ fn main() -> ExitCode {
     }
 }
 
-fn inner_main(action: Action, config: Config) -> Result<()> {
+fn inner_main(action: Action, exclude: &[PathBuf]) -> Result<()> {
+    // Compute the list diectories to exclude
+    let exclude_dirs = compute_exclusions(exclude)?;
+
     match action {
-        Action::List(args) => actions::list(args, &config)?,
-        Action::Remove(args) => actions::remove(args, &config)?,
-        Action::Drop(args) => actions::drop(args, &config)?,
-        Action::PathOf(args) => actions::path_of(args, &config)?,
-        Action::Restore(args) => actions::restore(args, &config)?,
-        Action::Empty => actions::empty(&config)?,
-        Action::TrashPath => actions::trash_path(&config)?,
+        Action::List(args) => actions::list(args, &exclude_dirs)?,
+        Action::Remove(args) => actions::remove(args, &exclude_dirs)?,
+        Action::Drop(args) => actions::drop(args, &exclude_dirs)?,
+        Action::PathOf(args) => actions::path_of(args, &exclude_dirs)?,
+        Action::Restore(args) => actions::restore(args, &exclude_dirs)?,
+        Action::Empty => actions::empty(&exclude_dirs)?,
+        Action::TrashPath => actions::trash_path(&exclude_dirs)?,
     }
 
     Ok(())

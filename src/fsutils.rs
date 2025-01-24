@@ -3,8 +3,7 @@ use std::{
     collections::BTreeSet,
     ffi::OsStr,
     fs,
-    path::Component,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     rc::Rc,
 };
 
@@ -16,8 +15,6 @@ use jiff::Zoned;
 use log::{debug, error, warn};
 use mountpoints::mountpaths;
 use walkdir::WalkDir;
-
-use crate::Config;
 
 use super::items::TrashItemInfos;
 
@@ -42,26 +39,20 @@ pub static ALWAYS_EXCLUDE_DIRS: &[&str] = &[
     "/var/lib/docker",
 ];
 
-/// Determine path to the trash directory for a given item and create it if required
-pub fn determine_trash_dir_for(item: &Path, config: &Config) -> Result<PathBuf> {
-    debug!("Determining trasher directory for item: {}", item.display());
+/// Compute the list of directories to exclude
+pub fn compute_exclusions(exclude_dirs: &[PathBuf]) -> Result<Vec<PathBuf>> {
+    debug!("Computing directories to exclude...");
 
-    let home_dir = dirs::home_dir().context("Failed to determine path to user's home directory")?;
-
-    let mut exclude = config
-        .exclude
+    let mut exclude = exclude_dirs
         .iter()
-        .filter_map(|dir| {
-            if !dir.is_dir() {
-                None
-            } else {
-                Some(fs::canonicalize(dir).with_context(|| {
-                    format!(
-                        "Failed to canonicalize excluded directory: {}",
-                        dir.display()
-                    )
-                }))
-            }
+        .filter(|dir| dir.is_dir())
+        .map(|dir| {
+            fs::canonicalize(dir).with_context(|| {
+                format!(
+                    "Failed to canonicalize excluded directory: {}",
+                    dir.display()
+                )
+            })
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -73,14 +64,23 @@ pub fn determine_trash_dir_for(item: &Path, config: &Config) -> Result<PathBuf> 
             .map(Path::to_owned),
     );
 
+    Ok(exclude)
+}
+
+/// Determine path to the trash directory for a given item and create it if required
+pub fn determine_trash_dir_for(item: &Path, exclude_dirs: &[PathBuf]) -> Result<PathBuf> {
+    debug!("Determining trasher directory for item: {}", item.display());
+
+    let home_dir = dirs::home_dir().context("Failed to determine path to user's home directory")?;
+
     // Don't canonicalize excluded item paths
     // NOTE: Only works if item path is absolute
-    if exclude.iter().any(|dir| item.starts_with(dir)) {
+    if exclude_dirs.iter().any(|dir| item.starts_with(dir)) {
         return Ok(home_dir.join(TRASH_DIR_NAME));
     }
 
     let item = fs::canonicalize(item)
-        .with_context(|| format!("Failed to canonicalize item path: {}\n\nTip: you can exclude this directory using --exclude.", item.display()))?;
+        .with_context(|| format!("Failed to canonicalize item path: {}", item.display()))?;
 
     let mut mountpoints = mountpaths().context("Failed to list system mountpoints")?;
 
@@ -125,7 +125,7 @@ pub fn determine_trash_dir_for(item: &Path, config: &Config) -> Result<PathBuf> 
             continue;
         }
 
-        if exclude.iter().any(|parent| item.starts_with(parent)) {
+        if exclude_dirs.iter().any(|parent| item.starts_with(parent)) {
             found = None;
             break;
         }
@@ -140,25 +140,28 @@ pub fn determine_trash_dir_for(item: &Path, config: &Config) -> Result<PathBuf> 
 }
 
 /// List all trash directories
-pub fn list_trash_dirs(config: &Config) -> Result<BTreeSet<PathBuf>> {
+pub fn list_trash_dirs(exclude_dirs: &[PathBuf]) -> Result<BTreeSet<PathBuf>> {
     let canon_root = fs::canonicalize("/").context("Failed to canonicalize the root directory")?;
 
     let trash_dirs = mountpaths()
         .context("Failed to list system mountpoints")?
         .iter()
         .chain([canon_root].iter())
-        .filter(|path| match fs::metadata(path) {
-            Ok(_) => true,
-
-            Err(err) => {
-                warn!("Warning: Skipping mountpoint {}: {err}", path.display());
-                false
+        .filter(|dir| {
+            !exclude_dirs
+                .iter()
+                .any(|excluded| dir.starts_with(excluded))
+        })
+        .filter_map(|dir| match fs::metadata(dir) {
+            Ok(_) => Some(dir.join(TRASH_DIR_NAME)),
+            Err(_) => {
+                warn!("Skipping unavailable directory: {}", dir.display());
+                None
             }
         })
-        .map(|path| determine_trash_dir_for(path, config))
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect();
 
-    Ok(trash_dirs.into_iter().filter(|dir| dir.is_dir()).collect())
+    Ok(trash_dirs)
 }
 
 /// List and parse all items in the trash
@@ -213,8 +216,8 @@ pub fn list_trash_items(trash_dir: &Path) -> Result<Vec<TrashedItem>> {
 }
 
 /// List all trash items
-pub fn list_all_trash_items(config: &Config) -> Result<Vec<TrashedItem>> {
-    let all_trash_items = list_trash_dirs(config)?
+pub fn list_all_trash_items(exclude_dirs: &[PathBuf]) -> Result<Vec<TrashedItem>> {
+    let all_trash_items = list_trash_dirs(exclude_dirs)?
         .into_iter()
         .map(|trash_dir| list_trash_items(&trash_dir))
         .collect::<Result<Vec<_>, _>>()?;
@@ -229,9 +232,9 @@ pub fn list_all_trash_items(config: &Config) -> Result<Vec<TrashedItem>> {
 pub fn expect_trash_item(
     filename: &str,
     id: Option<&str>,
-    config: &Config,
+    exclude_dirs: &[PathBuf],
 ) -> Result<FoundTrashItems> {
-    let mut candidates = list_all_trash_items(config)?
+    let mut candidates = list_all_trash_items(exclude_dirs)?
         .into_iter()
         .filter(|trashed| trashed.data.filename == filename)
         .collect::<Vec<_>>();
@@ -257,9 +260,9 @@ pub fn expect_trash_item(
 pub fn expect_single_trash_item(
     filename: &str,
     id: Option<&str>,
-    config: &Config,
+    exclude_dirs: &[PathBuf],
 ) -> Result<TrashedItem> {
-    match expect_trash_item(filename, id, config)? {
+    match expect_trash_item(filename, id, exclude_dirs)? {
         FoundTrashItems::Single(item) => Ok(item),
         FoundTrashItems::Multi(candidates) => bail!(
             "Multiple items with this filename were found in the trash:\n\n{}",
