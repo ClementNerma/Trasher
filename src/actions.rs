@@ -1,4 +1,4 @@
-use std::{fs, io::stdin, path::PathBuf};
+use std::{collections::BTreeSet, fs, io::stdin, path::PathBuf};
 
 use anyhow::{Context, Result};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -289,13 +289,17 @@ pub fn restore_with_ui(exclude_dirs: &[PathBuf]) -> Result<()> {
 }
 
 pub fn empty(exclude_dirs: &[PathBuf]) -> Result<()> {
-    let trash_dirs = list_trash_dirs(exclude_dirs)?;
     let items = list_all_trash_items(exclude_dirs)?;
 
     if items.is_empty() {
         info!("Trash is empty");
         return Ok(());
     }
+
+    let trash_dirs = items
+        .iter()
+        .map(|item| &item.trash_dir)
+        .collect::<BTreeSet<_>>();
 
     warn!("You are about to delete the entire trash directories of:\n");
 
@@ -305,7 +309,7 @@ pub fn empty(exclude_dirs: &[PathBuf]) -> Result<()> {
             trash_dir.display(),
             items
                 .iter()
-                .filter(|item| &item.trash_dir == trash_dir)
+                .filter(|item| &&item.trash_dir == trash_dir)
                 .count()
         );
     }
@@ -330,7 +334,7 @@ pub fn empty(exclude_dirs: &[PathBuf]) -> Result<()> {
 
         warn!("> Listing files and directories to delete...");
 
-        let items = list_deletable_fs_items(&trash_dir)?;
+        let items = list_deletable_fs_items(trash_dir)?;
 
         warn!("> Deleting all {} items...", items.len());
 
