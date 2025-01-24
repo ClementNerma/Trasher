@@ -336,7 +336,7 @@ pub fn empty(exclude_dirs: &[PathBuf]) -> Result<()> {
 
         let items = list_deletable_fs_items(trash_dir)?;
 
-        warn!("> Deleting all {} items...", items.len());
+        warn!("> Deleting {} item(s) recursively...", items.len());
 
         let pbr = ProgressBar::new(items.len().try_into().unwrap());
 
