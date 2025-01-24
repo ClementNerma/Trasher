@@ -143,10 +143,12 @@ pub fn determine_trash_dir_for(item: &Path, exclude_dirs: &[PathBuf]) -> Result<
 pub fn list_trash_dirs(exclude_dirs: &[PathBuf]) -> Result<BTreeSet<PathBuf>> {
     let canon_root = fs::canonicalize("/").context("Failed to canonicalize the root directory")?;
 
+    let home_dir = dirs::home_dir().context("Failed to determine path to user's home directory")?;
+
     let trash_dirs = mountpaths()
         .context("Failed to list system mountpoints")?
         .iter()
-        .chain([canon_root].iter())
+        .chain([home_dir, canon_root].iter())
         .filter(|dir| {
             !exclude_dirs
                 .iter()
