@@ -58,11 +58,7 @@ pub enum Action {
         allow_invalid_utf8_item_names: bool,
     },
 
-    #[clap(
-        name = "unrm",
-        alias = "restore",
-        about = "Restore an item from the trash"
-    )]
+    #[clap(name = "unrm", about = "Restore an item from the trash")]
     Restore {
         #[clap(help = "Name of the item to restore")]
         filename: Option<String>,
@@ -82,7 +78,7 @@ pub enum Action {
         id: Option<String>,
     },
 
-    #[clap(name = "drop", about = "Permanently delete an item from the trash")]
+    #[clap(about = "Permanently delete an item from the trash")]
     Drop {
         #[clap(help = "Name of the item to permanently delete from the trash")]
         filename: String,
@@ -94,10 +90,7 @@ pub enum Action {
         id: Option<String>,
     },
 
-    #[clap(
-        name = "path-of",
-        about = "Get the path of an item inside the trash directory"
-    )]
+    #[clap(about = "Get the path of an item inside the trash directory")]
     PathOf {
         #[clap(help = "Name of the item to get the path of in the trash")]
         filename: String,
@@ -116,12 +109,9 @@ pub enum Action {
         allow_invalid_utf8_path: bool,
     },
 
-    #[clap(
-        name = "trash-path",
-        about = "Get the path of the trash directory for the current folder"
-    )]
+    #[clap(about = "Get the path of the trash directory for the current folder")]
     TrashPath,
 
-    #[clap(name = "empty", about = "Permanently delete all items in the trash")]
+    #[clap(about = "Permanently delete all items in the trash")]
     Empty,
 }
