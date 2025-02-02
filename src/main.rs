@@ -16,6 +16,7 @@ use std::{collections::BTreeSet, fs, io::stdin, path::PathBuf, process::ExitCode
 use anyhow::{bail, Context, Result};
 use clap::Parser;
 use cmd::*;
+use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 use jiff::Zoned;
 use log::{debug, error, info, warn};
@@ -23,8 +24,8 @@ use log::{debug, error, info, warn};
 use self::{
     fsutils::{
         are_on_same_fs, compute_exclusions, determine_trash_dir_for, expect_single_trash_item,
-        is_dangerous_path, list_all_trash_items, list_deletable_fs_items, move_item_pbr,
-        table_for_items, TrashedItem, TRASH_TRANSFER_DIRNAME,
+        is_dangerous_path, list_all_trash_items, list_deletable_fs_items, list_trash_dirs,
+        list_trash_items, move_item_pbr, table_for_items, TrashedItem, TRASH_TRANSFER_DIRNAME,
     },
     fuzzy::{run_fuzzy_finder, FuzzyFinderItem},
     items::TrashItemInfos,
@@ -56,27 +57,41 @@ fn inner_main(action: Action, exclude: &[PathBuf]) -> Result<()> {
     let exclude_dirs = compute_exclusions(exclude)?;
 
     match action {
-        Action::List { name } => {
+        Action::List { name, all } => {
             debug!("Listing trash items...");
 
-            let mut items = list_all_trash_items(&exclude_dirs)?;
+            let trash_dirs = if all {
+                list_trash_dirs(&exclude_dirs)?
+            } else {
+                let current_dir =
+                    std::env::current_dir().context("Failed to determine current directory")?;
 
-            if items.is_empty() {
-                info!("All trashes are empty.");
-                return Ok(());
-            }
+                BTreeSet::from([determine_trash_dir_for(&current_dir, &exclude_dirs)?])
+            };
 
-            if let Some(name) = &name {
-                debug!("Filtering {} items by name...", items.len());
-                items.retain(|trashed| trashed.data.filename.contains(name));
+            for trash_dir in trash_dirs {
+                println!("Content of trash directory: {}\n", trash_dir.display());
+
+                let mut items = list_trash_items(&trash_dir)?;
 
                 if items.is_empty() {
-                    info!("No item in trash match the provided name.");
-                    return Ok(());
+                    info!("{}", "Trash is empty.".italic());
+                    continue;
                 }
-            }
 
-            println!("{}", table_for_items(&items));
+                if let Some(name) = &name {
+                    debug!("Filtering {} items by name...", items.len());
+
+                    items.retain(|trashed| trashed.data.filename.contains(name));
+
+                    if items.is_empty() {
+                        info!("No item in trash match the provided name.");
+                        continue;
+                    }
+                }
+
+                println!("{}", table_for_items(&items));
+            }
         }
 
         Action::Remove {

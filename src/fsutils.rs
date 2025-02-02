@@ -68,19 +68,19 @@ pub fn compute_exclusions(exclude_dirs: &[PathBuf]) -> Result<Vec<PathBuf>> {
 }
 
 /// Determine path to the trash directory for a given item and create it if required
-pub fn determine_trash_dir_for(item: &Path, exclude_dirs: &[PathBuf]) -> Result<PathBuf> {
-    debug!("Determining trasher directory for item: {}", item.display());
+pub fn determine_trash_dir_for(path: &Path, exclude_dirs: &[PathBuf]) -> Result<PathBuf> {
+    debug!("Determining trasher directory for path: {}", path.display());
 
     let home_dir = dirs::home_dir().context("Failed to determine path to user's home directory")?;
 
     // Don't canonicalize excluded item paths
     // NOTE: Only works if item path is absolute
-    if exclude_dirs.iter().any(|dir| item.starts_with(dir)) {
+    if exclude_dirs.iter().any(|dir| path.starts_with(dir)) {
         return Ok(home_dir.join(TRASH_DIR_NAME));
     }
 
-    let item = fs::canonicalize(item)
-        .with_context(|| format!("Failed to canonicalize item path: {}", item.display()))?;
+    let item = fs::canonicalize(path)
+        .with_context(|| format!("Failed to canonicalize item path: {}", path.display()))?;
 
     let mut mountpoints = mountpaths().context("Failed to list system mountpoints")?;
 
@@ -405,17 +405,10 @@ pub fn table_for_items(items: &[TrashedItem]) -> Table {
     table
         .load_preset(UTF8_FULL_CONDENSED)
         .set_content_arrangement(ContentArrangement::Dynamic)
-        .set_header(vec![
-            "Type",
-            "Filename",
-            "Size",
-            "ID",
-            "Deleted on",
-            "Trash directory",
-        ]);
+        .set_header(vec!["Type", "Filename", "Size", "ID", "Deleted on"]);
 
     for item in items {
-        let TrashedItem { data, trash_dir } = item;
+        let TrashedItem { data, trash_dir: _ } = item;
 
         let TrashItemInfos { filename, datetime } = data;
 
@@ -448,7 +441,6 @@ pub fn table_for_items(items: &[TrashedItem]) -> Table {
             Zoned::try_from(*datetime)
                 .and_then(|date| jiff::fmt::rfc2822::to_string(&date))
                 .unwrap_or_else(|_| "<Failed to format date>".to_owned()),
-            trash_dir.to_string_lossy().into_owned(),
         ]);
     }
 

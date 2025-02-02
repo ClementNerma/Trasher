@@ -33,6 +33,9 @@ pub enum Action {
     List {
         #[clap(long, help = "Only list occurrences of items with a specific name")]
         name: Option<String>,
+
+        #[clap(long, help = "List items across all trash directories")]
+        all: bool,
     },
 
     #[clap(name = "rm", about = "Move an item to the trash")]
