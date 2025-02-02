@@ -488,7 +488,7 @@ pub fn list_deletable_fs_items(path: &Path) -> Result<Vec<PathBuf>> {
         .min_depth(1)
         .contents_first(true)
         .into_iter()
-        .filter_entry(|entry| entry.depth() == 1 && entry.file_name() == TRASH_TRANSFER_DIRNAME)
+        .filter_entry(|entry| entry.depth() != 1 || entry.file_name() != TRASH_TRANSFER_DIRNAME)
         .map(|entry| entry.map(|entry| entry.into_path()))
         .collect::<Result<Vec<PathBuf>, _>>()
         .context("Failed to read directory entry")
