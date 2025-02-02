@@ -279,7 +279,7 @@ pub fn expect_single_trash_item(
                 err_msg.push_str(&format!(
                     "* In {}:\n\n{}\n\n",
                     trash_dir.display(),
-                    table_for_items(&trash_dir, &items)
+                    table_for_items(&trash_dir, &items)?
                 ));
             }
 
@@ -414,7 +414,7 @@ pub fn move_item_pbr(path: &Path, target: &Path) -> Result<()> {
     Ok(())
 }
 
-pub fn table_for_items(trash_dir: &Path, items: &[TrashItemInfos]) -> Table {
+pub fn table_for_items(trash_dir: &Path, items: &[TrashItemInfos]) -> Result<Table> {
     let mut table = Table::new();
 
     table
@@ -425,34 +425,33 @@ pub fn table_for_items(trash_dir: &Path, items: &[TrashItemInfos]) -> Table {
     for item in items {
         let TrashItemInfos { filename, datetime } = item;
 
-        let mt = fs::metadata(trash_dir.join(item.trash_filename()));
+        let item_path = trash_dir.join(item.trash_filename());
+
+        let mt = fs::metadata(&item_path).with_context(|| {
+            format!(
+                "Failed to get metadata about trash item at: {}",
+                item_path.display()
+            )
+        })?;
 
         table.add_row([
             // Item type
-            mt.as_ref()
-                .map(|mt| {
-                    if mt.file_type().is_file() {
-                        "File"
-                    } else if mt.file_type().is_dir() {
-                        "Directory"
-                    } else {
-                        "<Unknown>"
-                    }
-                    .to_owned()
-                })
-                .unwrap_or_else(|err| format!("ERROR: {err}")),
+            if mt.file_type().is_file() {
+                "File"
+            } else if mt.file_type().is_dir() {
+                "Directory"
+            } else {
+                "<Unknown>"
+            }
+            .to_owned(),
             // Filename
-            filename.clone(),
+            filename.to_owned(),
             // File size
-            mt.as_ref()
-                .map(|mt| {
-                    if mt.file_type().is_file() {
-                        human_readable_size(mt.len())
-                    } else {
-                        String::new()
-                    }
-                })
-                .unwrap_or_else(|_| "ERROR".to_owned()),
+            if mt.file_type().is_file() {
+                human_readable_size(mt.len())
+            } else {
+                String::new()
+            },
             // Item's ID
             item.compute_id(),
             // Deletion date and time
@@ -462,7 +461,7 @@ pub fn table_for_items(trash_dir: &Path, items: &[TrashItemInfos]) -> Table {
         ]);
     }
 
-    table
+    Ok(table)
 }
 
 pub fn are_on_same_fs(a: &Path, b: &Path) -> Result<bool> {
@@ -493,7 +492,7 @@ pub fn are_on_same_fs(a: &Path, b: &Path) -> Result<bool> {
     Ok(a_fs_id == b_fs_id)
 }
 
-pub fn list_deletable_fs_items(path: &Path) -> Result<Vec<PathBuf>> {
+pub fn list_trash_items_recursively(path: &Path) -> Result<Vec<PathBuf>> {
     WalkDir::new(path)
         .min_depth(1)
         .contents_first(true)

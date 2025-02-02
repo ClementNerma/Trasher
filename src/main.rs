@@ -24,8 +24,9 @@ use log::{debug, error, info, warn};
 use self::{
     fsutils::{
         are_on_same_fs, compute_exclusions, determine_trash_dir_for, expect_single_trash_item,
-        is_dangerous_path, list_all_trash_items, list_deletable_fs_items, list_trash_dirs,
-        list_trash_items, move_item_pbr, table_for_items, TrashedItem, TRASH_TRANSFER_DIRNAME,
+        is_dangerous_path, list_all_trash_items, list_trash_dirs, list_trash_items,
+        list_trash_items_recursively, move_item_pbr, table_for_items, TrashedItem,
+        TRASH_TRANSFER_DIRNAME,
     },
     fuzzy::{run_fuzzy_finder, FuzzyFinderItem},
     items::TrashItemInfos,
@@ -92,7 +93,7 @@ fn inner_main(action: Action, exclude: &[PathBuf]) -> Result<()> {
 
                 items.sort_by_key(|item| item.datetime);
 
-                println!("{}", table_for_items(&trash_dir, &items));
+                println!("{}", table_for_items(&trash_dir, &items)?);
             }
         }
 
@@ -387,7 +388,7 @@ fn inner_main(action: Action, exclude: &[PathBuf]) -> Result<()> {
 
                 warn!("> Listing files and directories to delete...");
 
-                let items = list_deletable_fs_items(trash_dir)?;
+                let items = list_trash_items_recursively(trash_dir)?;
 
                 warn!("> Deleting {} item(s) recursively...", items.len());
 
