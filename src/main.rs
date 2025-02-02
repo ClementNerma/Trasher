@@ -279,12 +279,22 @@ fn inner_main(action: Action, exclude: &[PathBuf]) -> Result<()> {
 
             let item_path = item.complete_trash_item_path();
 
-            let target_path = match to {
-                Some(to) => to,
+            let mut target_path = match to {
+                Some(to) => {
+                    if to.is_absolute() {
+                        to
+                    } else {
+                        std::env::current_dir()
+                            .context("Failed to get current directory")?
+                            .join(to)
+                    }
+                }
                 None => std::env::current_dir().context("Failed to get current directory")?,
             };
 
-            let target_path = target_path.join(&item.data.filename);
+            if target_path.is_dir() {
+                target_path = target_path.join(&item.data.filename);
+            }
 
             if target_path.exists() {
                 bail!("Target path already exists.");
@@ -292,9 +302,9 @@ fn inner_main(action: Action, exclude: &[PathBuf]) -> Result<()> {
 
             let target_parent = target_path.parent().unwrap();
 
-            if !target_parent.exists() {
+            if !target_parent.is_dir() {
                 bail!(
-                    "Target directory '{}' does not exist",
+                    "Target's parent directory does not exist: {}",
                     target_parent.display()
                 );
             }
