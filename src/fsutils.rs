@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::BTreeSet,
+    collections::{BTreeSet, HashMap},
     ffi::OsStr,
     fs,
     path::{Component, Path, PathBuf},
@@ -167,67 +167,60 @@ pub fn list_trash_dirs(exclude_dirs: &[PathBuf]) -> Result<BTreeSet<PathBuf>> {
 }
 
 /// List and parse all items in the trash
-pub fn list_trash_items(trash_dir: &Path) -> Result<Vec<TrashedItem>> {
-    if !trash_dir.exists() {
-        return Ok(vec![]);
-    }
+pub fn list_trash_items(trash_dir: &Path) -> Result<impl Iterator<Item = TrashItemInfos>> {
+    let dir_entries = if trash_dir.exists() {
+        fs::read_dir(trash_dir)
+            .context("Failed to read trash directory")?
+            .collect::<Result<Vec<_>, _>>()?
+    } else {
+        vec![]
+    };
 
-    let dir_entries = fs::read_dir(trash_dir)
-        .context("Failed to read trash directory")?
-        .collect::<Result<Vec<_>, _>>()?;
+    Ok(dir_entries.into_iter().filter_map(|item| {
+        let Ok(filename) = item.file_name().into_string() else {
+            error!(
+                "WARN: Trash item '{}' does not have a valid UTF-8 filename!",
+                item.path().display()
+            );
 
-    let items = dir_entries
-        .into_iter()
-        .filter_map(|item| {
-            match item.file_name().into_string() {
-                Err(_) => error!(
-                    "WARN: Trash item '{}' does not have a valid UTF-8 filename!",
+            return None;
+        };
+
+        if filename == TRASH_TRANSFER_DIRNAME {
+            return None;
+        }
+
+        match TrashItemInfos::decode(&filename) {
+            Ok(item) => Some(item),
+
+            Err(err) => {
+                error!(
+                    "WARN: Trash item '{}' does not have a valid trash filename!",
                     item.path().display()
-                ),
+                );
 
-                Ok(filename) => {
-                    if filename == TRASH_TRANSFER_DIRNAME {
-                        return None;
-                    }
+                debug!("Invalid trash item filename: {:?}", err);
 
-                    match TrashItemInfos::decode(&filename) {
-                        Err(err) => {
-                            error!(
-                                "WARN: Trash item '{}' does not have a valid trash filename!",
-                                item.path().display()
-                            );
-
-                            debug!("Invalid trash item filename: {:?}", err);
-                        }
-
-                        Ok(item) => {
-                            return Some(TrashedItem {
-                                data: item,
-                                trash_dir: trash_dir.to_path_buf(),
-                            })
-                        }
-                    }
-                }
+                None
             }
-
-            None
-        })
-        .collect();
-
-    Ok(items)
+        }
+    }))
 }
 
 /// List all trash items
 pub fn list_all_trash_items(exclude_dirs: &[PathBuf]) -> Result<Vec<TrashedItem>> {
-    let all_trash_items = list_trash_dirs(exclude_dirs)?
-        .into_iter()
-        .map(|trash_dir| list_trash_items(&trash_dir))
-        .collect::<Result<Vec<_>, _>>()?;
+    let mut all_trash_items = vec![];
 
-    let mut items = all_trash_items.into_iter().flatten().collect::<Vec<_>>();
-    items.sort_by_key(|item| item.data.datetime);
+    for trash_dir in list_trash_dirs(exclude_dirs)? {
+        let trash_items = list_trash_items(&trash_dir)?;
 
-    Ok(items)
+        all_trash_items.extend(trash_items.map(|item| TrashedItem {
+            data: item,
+            trash_dir: trash_dir.clone(),
+        }));
+    }
+
+    Ok(all_trash_items)
 }
 
 /// Find a specific item in the trash (panic if not found)
@@ -238,7 +231,7 @@ pub fn expect_trash_item(
 ) -> Result<FoundTrashItems> {
     let mut candidates = list_all_trash_items(exclude_dirs)?
         .into_iter()
-        .filter(|trashed| trashed.data.filename == filename)
+        .filter(|item| item.data.filename == filename)
         .collect::<Vec<_>>();
 
     if candidates.is_empty() {
@@ -249,7 +242,7 @@ pub fn expect_trash_item(
             Some(id) => Ok(FoundTrashItems::Single(
                 candidates
                     .into_iter()
-                    .find(|c| c.data.compute_id() == id)
+                    .find(|item| item.data.compute_id() == id)
                     .context("There is no trash item with the provided ID")?,
             )),
         }
@@ -266,10 +259,32 @@ pub fn expect_single_trash_item(
 ) -> Result<TrashedItem> {
     match expect_trash_item(filename, id, exclude_dirs)? {
         FoundTrashItems::Single(item) => Ok(item),
-        FoundTrashItems::Multi(candidates) => bail!(
-            "Multiple items with this filename were found in the trash:\n\n{}",
-            table_for_items(&candidates)
-        ),
+        FoundTrashItems::Multi(candidates) => {
+            let mut err_msg =
+                "Multiple items with this filename were found in the trash:\n\n".to_string();
+
+            let mut by_trash_dir = HashMap::with_capacity(candidates.len());
+
+            for candidate in candidates {
+                let TrashedItem { data, trash_dir } = candidate;
+
+                if !by_trash_dir.contains_key(&trash_dir) {
+                    by_trash_dir.insert(trash_dir.clone(), vec![]);
+                }
+
+                by_trash_dir.get_mut(&trash_dir).unwrap().push(data);
+            }
+
+            for (trash_dir, items) in by_trash_dir {
+                err_msg.push_str(&format!(
+                    "* In {}:\n\n{}\n\n",
+                    trash_dir.display(),
+                    table_for_items(&trash_dir, &items)
+                ));
+            }
+
+            bail!("{err_msg}");
+        }
     }
 }
 
@@ -399,22 +414,21 @@ pub fn move_item_pbr(path: &Path, target: &Path) -> Result<()> {
     Ok(())
 }
 
-pub fn table_for_items(items: &[TrashedItem]) -> Table {
+pub fn table_for_items(trash_dir: &Path, items: &[TrashItemInfos]) -> Table {
     let mut table = Table::new();
 
     table
         .load_preset(UTF8_FULL_CONDENSED)
         .set_content_arrangement(ContentArrangement::Dynamic)
-        .set_header(vec!["Type", "Filename", "Size", "ID", "Deleted on"]);
+        .set_header(["Type", "Filename", "Size", "ID", "Deleted on"]);
 
     for item in items {
-        let TrashedItem { data, trash_dir: _ } = item;
+        let TrashItemInfos { filename, datetime } = item;
 
-        let TrashItemInfos { filename, datetime } = data;
+        let mt = fs::metadata(trash_dir.join(item.trash_filename()));
 
-        let mt = fs::metadata(item.complete_trash_item_path());
-
-        table.add_row(vec![
+        table.add_row([
+            // Item type
             mt.as_ref()
                 .map(|mt| {
                     if mt.file_type().is_file() {
@@ -427,7 +441,9 @@ pub fn table_for_items(items: &[TrashedItem]) -> Table {
                     .to_owned()
                 })
                 .unwrap_or_else(|err| format!("ERROR: {err}")),
+            // Filename
             filename.clone(),
+            // File size
             mt.as_ref()
                 .map(|mt| {
                     if mt.file_type().is_file() {
@@ -437,7 +453,9 @@ pub fn table_for_items(items: &[TrashedItem]) -> Table {
                     }
                 })
                 .unwrap_or_else(|_| "ERROR".to_owned()),
-            data.compute_id(),
+            // Item's ID
+            item.compute_id(),
+            // Deletion date and time
             Zoned::try_from(*datetime)
                 .and_then(|date| jiff::fmt::rfc2822::to_string(&date))
                 .unwrap_or_else(|_| "<Failed to format date>".to_owned()),

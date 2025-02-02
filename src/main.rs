@@ -72,7 +72,7 @@ fn inner_main(action: Action, exclude: &[PathBuf]) -> Result<()> {
             for trash_dir in trash_dirs {
                 println!("Content of trash directory: {}\n", trash_dir.display());
 
-                let mut items = list_trash_items(&trash_dir)?;
+                let mut items = list_trash_items(&trash_dir)?.collect::<Vec<_>>();
 
                 if items.is_empty() {
                     info!("{}", "Trash is empty.".italic());
@@ -82,7 +82,7 @@ fn inner_main(action: Action, exclude: &[PathBuf]) -> Result<()> {
                 if let Some(name) = &name {
                     debug!("Filtering {} items by name...", items.len());
 
-                    items.retain(|trashed| trashed.data.filename.contains(name));
+                    items.retain(|item| item.filename.contains(name));
 
                     if items.is_empty() {
                         info!("No item in trash match the provided name.");
@@ -90,7 +90,9 @@ fn inner_main(action: Action, exclude: &[PathBuf]) -> Result<()> {
                     }
                 }
 
-                println!("{}", table_for_items(&items));
+                items.sort_by_key(|item| item.datetime);
+
+                println!("{}", table_for_items(&trash_dir, &items));
             }
         }
 
