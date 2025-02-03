@@ -11,7 +11,7 @@ use anyhow::{bail, Context, Result};
 use comfy_table::{presets::UTF8_FULL_CONDENSED, ContentArrangement, Table};
 use fs_extra::dir::TransitProcessResult;
 use indicatif::{ProgressBar, ProgressStyle};
-use jiff::Zoned;
+use jiff::tz::TimeZone;
 use log::{debug, error, warn};
 use mountpoints::mountpaths;
 use walkdir::WalkDir;
@@ -423,7 +423,10 @@ pub fn table_for_items(trash_dir: &Path, items: &[TrashItemInfos]) -> Result<Tab
         .set_header(["Type", "Filename", "Size", "ID", "Deleted on"]);
 
     for item in items {
-        let TrashItemInfos { filename, datetime } = item;
+        let TrashItemInfos {
+            filename,
+            deleted_at,
+        } = item;
 
         let item_path = trash_dir.join(item.trash_filename());
 
@@ -455,7 +458,8 @@ pub fn table_for_items(trash_dir: &Path, items: &[TrashItemInfos]) -> Result<Tab
             // Item's ID
             item.compute_id(),
             // Deletion date and time
-            Zoned::try_from(*datetime)
+            deleted_at
+                .to_zoned(TimeZone::system())
                 .and_then(|date| jiff::fmt::rfc2822::to_string(&date))
                 .unwrap_or_else(|_| "<Failed to format date>".to_owned()),
         ]);

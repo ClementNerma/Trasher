@@ -18,7 +18,7 @@ use clap::Parser;
 use cmd::*;
 use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
-use jiff::Zoned;
+use jiff::tz::TimeZone;
 use log::{debug, error, info, warn};
 
 use self::{
@@ -91,7 +91,7 @@ fn inner_main(action: Action, exclude: &[PathBuf]) -> Result<()> {
                     }
                 }
 
-                items.sort_by_key(|item| item.datetime);
+                items.sort_by_key(|item| item.deleted_at);
 
                 println!("{}", table_for_items(&trash_dir, &items)?);
             }
@@ -283,7 +283,9 @@ fn inner_main(action: Action, exclude: &[PathBuf]) -> Result<()> {
                             .map(|item| FuzzyFinderItem {
                                 display: format!(
                                     "[{}] {}",
-                                    Zoned::try_from(item.data.datetime)
+                                    item.data
+                                        .deleted_at
+                                        .to_zoned(TimeZone::system())
                                         .and_then(|date| jiff::fmt::rfc2822::to_string(&date))
                                         .unwrap_or_else(|_| "<Failed to format date>".to_owned()),
                                     item.data.filename

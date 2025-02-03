@@ -1,36 +1,35 @@
-use std::{
-    str,
-    sync::LazyLock,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::{str, sync::LazyLock};
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use jiff::{civil::{Date, DateTime, Time}, SignedDuration, Zoned};
 
 static NAME_ID_SEPARATOR: &str = " ^";
 
-static DATE_REFERENTIAL: LazyLock<SystemTime> =
+static DATE_REFERENTIAL: LazyLock<DateTime> =
     LazyLock::new(|| 
         // 2024 January 1st. 00:00:00 UTC
-        UNIX_EPOCH + Duration::from_secs(1704067200)
+        Date::new(2024, 1, 1)
+            .unwrap()
+            .to_datetime(Time::midnight())
     );
 
 #[derive(Debug, Clone)]
 pub struct TrashItemInfos {
     pub filename: String,
-    pub datetime: SystemTime,
+    pub deleted_at: DateTime,
 }
 
 impl TrashItemInfos {
-    pub fn new(filename: String, datetime: SystemTime) -> Self {
-        Self { filename, datetime }
+    pub fn new(filename: String, deleted_at: DateTime) -> Self {
+        Self { filename, deleted_at }
     }
 
     pub fn new_now(filename: String) -> Self {
-        Self::new(filename, SystemTime::now())
+        Self::new(filename, Zoned::now().datetime())
     }
 
     pub fn compute_id(&self) -> String {
-        let id_bytes = self.datetime.duration_since(*DATE_REFERENTIAL).unwrap().as_nanos().to_be_bytes();
+        let id_bytes = self.deleted_at.duration_since(*DATE_REFERENTIAL).as_nanos().to_be_bytes();
         let id_bytes = &id_bytes[id_bytes.iter().position(|b| *b != 0).unwrap_or(0)..];
 
         URL_SAFE_NO_PAD.encode(id_bytes)
@@ -56,11 +55,11 @@ impl TrashItemInfos {
         let mut int_bytes = [0u8; 16];
         int_bytes[16 - id.len()..16].copy_from_slice(&id);
 
-        let id = u128::from_be_bytes(int_bytes);
+        let id = i128::from_be_bytes(int_bytes);
 
         let datetime = *DATE_REFERENTIAL
-            + Duration::from_secs((id / 1_000_000_000) as u64)
-            + Duration::from_nanos((id % 1_000_000_000) as u64);
+            + SignedDuration::from_secs((id / 1_000_000_000) as i64)
+            + SignedDuration::from_nanos((id % 1_000_000_000) as i64);
 
         Ok(Self::new(
             trash_filename[0..circumflex_pos].to_owned(),
