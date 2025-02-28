@@ -70,7 +70,12 @@ fn inner_main(action: Action, exclude: &[PathBuf]) -> Result<()> {
                 BTreeSet::from([determine_trash_dir_for(&current_dir, &exclude_dirs)?])
             };
 
-            for trash_dir in trash_dirs {
+            for (i, trash_dir) in trash_dirs.into_iter().enumerate() {
+                // Spacing
+                if i > 0 {
+                    println!();
+                }
+
                 println!("Content of trash directory: {}\n", trash_dir.display());
 
                 let mut items = list_trash_items(&trash_dir)?.collect::<Vec<_>>();
