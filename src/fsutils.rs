@@ -497,12 +497,21 @@ pub fn are_on_same_fs(a: &Path, b: &Path) -> Result<bool> {
 }
 
 pub fn list_trash_items_recursively(path: &Path) -> Result<Vec<PathBuf>> {
-    WalkDir::new(path)
+    let mut items = WalkDir::new(path)
         .min_depth(1)
-        .contents_first(true)
         .into_iter()
-        .filter_entry(|entry| entry.depth() != 1 || entry.file_name() != TRASH_TRANSFER_DIRNAME)
+        // Remove transfer directory (but not its content)
+        .filter(|entry| match entry {
+            Ok(entry) => entry.depth() != 1 || entry.file_name() != TRASH_TRANSFER_DIRNAME,
+            Err(_) => true,
+        })
         .map(|entry| entry.map(|entry| entry.into_path()))
         .collect::<Result<Vec<PathBuf>, _>>()
-        .context("Failed to read directory entry")
+        .context("Failed to read directory entry")?;
+
+    // Put directories before their children
+    items.sort();
+    items.reverse();
+
+    Ok(items)
 }
